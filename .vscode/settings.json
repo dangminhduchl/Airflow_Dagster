@@ -1,0 +1,14 @@
+{
+  "python.defaultInterpreterPath": "/home/ducdm3/.pyenv/versions/3.12.0/bin/python",
+  "python.analysis.extraPaths": [
+    "/home/ducdm3/Self_training/AirFlow_Dagster",
+    "/home/ducdm3/Self_training/AirFlow_Dagster/airflow_demo/dags",
+    "/home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo"
+  ],
+  "python.analysis.indexing": true,
+  "python.analysis.packageIndexDepths": [
+    { "name": "airflow", "depth": 5 },
+    { "name": "dagster", "depth": 5 }
+  ],
+  "python.languageServer": "Pylance"
+}

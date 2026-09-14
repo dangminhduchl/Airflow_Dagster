@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trực Quan Hóa: Code ➔ Giao Diện ➔ Cơ Chế Chạy Ngầm (Airflow vs Dagster)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.8);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --cyan: #06b6d4;
+      --purple: #a855f7;
+      --blue: #3b82f6;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --text-light: #f9fafb;
+      --text-muted: #9ca3af;
+      --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background glows */
+    .glow-cyan {
+      position: fixed;
+      top: 5%;
+      left: 15%;
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.12), transparent 70%);
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-purple {
+      position: fixed;
+      bottom: 10%;
+      right: 15%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.1), transparent 70%);
+      filter: blur(90px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header Nav */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-badge {
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      color: #000;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    /* Tab Switcher */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .tab-btn.active {
+      background: var(--cyan);
+      color: #000;
+    }
+
+    main {
+      flex: 1;
+      padding: 30px;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+      position: relative;
+      z-index: 10;
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Section 1: Interactive Code-to-UI Split Screen */
+    .sub-switch {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 24px;
+      gap: 12px;
+    }
+    .sub-btn {
+      padding: 8px 24px;
+      border-radius: 30px;
+      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .sub-btn.active-af {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .sub-btn.active-dag {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: var(--purple);
+      color: var(--purple);
+    }
+
+    .split-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      min-height: 600px;
+    }
+
+    .editor-pane {
+      background: #0d1117;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .pane-header {
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .code-lines {
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-x: auto;
+      flex: 1;
+    }
+    .code-row {
+      display: block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .code-row:hover, .code-row.highlighted {
+      background: rgba(6, 182, 212, 0.18);
+      border-left: 3px solid var(--cyan);
+      padding-left: 12px;
+    }
+    .code-row.dag-hl:hover, .code-row.dag-hl.highlighted {
+      background: rgba(168, 85, 247, 0.18);
+      border-left: 3px solid var(--purple);
+    }
+
+    .ui-pane {
+      background: #131b2e;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .ui-mock-browser {
+      background: #0b111e;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.red { background: #ef4444; }
+    .dot.yellow { background: #eab308; }
+    .dot.green { background: #22c55e; }
+    .browser-url {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-left: 10px;
+      flex: 1;
+    }
+
+    .ui-canvas {
+      padding: 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    /* UI Simulation Components */
+    .sim-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.3s ease;
+    }
+    .sim-card.active-target {
+      border-color: var(--cyan);
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+      background: rgba(6, 182, 212, 0.08);
+      transform: scale(1.02);
+    }
+    .sim-card.active-target-dag {
+      border-color: var(--purple);
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+      background: rgba(168, 85, 247, 0.08);
+      transform: scale(1.02);
+    }
+
+    .tooltip-bubble {
+      background: #1f2937;
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #e5e7eb;
+      margin-top: 14px;
+      line-height: 1.5;
+    }
+
+    /* Section 2: Flow diagram animation */
+    .flow-card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+    .flow-column {
+      background: rgba(17, 24, 39, 0.7);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Section 3: Interactive Step-by-step Simulator */
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .sim-btn {
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      color: #000;
+      font-weight: 700;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sim-stepper {
+      display: flex;
+      gap: 12px;
+    }
+    .step-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .step-pill.current {
+      background: var(--cyan);
+      color: #000;
+      font-weight: 700;
+      border-color: var(--cyan);
+    }
+
+    .sim-stage {
+      background: #0d1117;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 30px;
+      min-height: 380px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Nodes graph visual */
+    .node-graph {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .g-node {
+      background: #1e293b;
+      border: 2px solid #334155;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-width: 150px;
+      transition: all 0.3s ease;
+    }
+    .g-node.active-node {
+      border-color: var(--cyan);
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.4);
+      background: #0e3042;
+    }
+    .g-node.active-node-dag {
+      border-color: var(--purple);
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.4);
+      background: #2e1065;
+    }
+    .arrow-right {
+      color: var(--text-muted);
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    /* Table styles */
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+    .matrix-table th {
+      background: rgba(31, 41, 55, 0.9);
+      padding: 16px 20px;
+      text-align: left;
+      font-size: 14px;
+      color: var(--cyan);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .matrix-table td {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .matrix-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge-auto {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--green);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .badge-manual {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--amber);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-cyan"></div>
+  <div class="glow-purple"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand-title">
+      <span class="brand-badge">VISUAL LAB</span>
+      <span>So Sánh Trực Quan: Code ➔ Giao Diện ➔ Cơ Chế Chạy Ngầm</span>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchMainTab('tab-code-ui')">
+        🔍 1. Code ➔ Giao Diện (UI)
+      </button>
+      <button class="tab-btn" onclick="switchMainTab('tab-connect')">
+        🔗 2. Cách Các Thành Phần Nối Nhau
+      </button>
+      <button class="tab-btn" onclick="switchMainTab('tab-lifecycle')">
+        ⚙️ 3. Cơ Chế Chạy Ngầm (Under The Hood)
+      </button>
+      <button class="tab-btn" onclick="switchMainTab('tab-matrix')">
+        📋 4. Tự Động vs Phải Cấu Hình
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- TAB 1: CODE ➔ UI MAPPING -->
+    <section id="tab-code-ui" class="tab-content active">
+      <div class="sub-switch">
+        <button class="sub-btn active-af" id="btn-show-af" onclick="switchFrameworkView('af')">
+          🌪️ Xem Apache Airflow (order_processing_dag.py)
+        </button>
+        <button class="sub-btn" id="btn-show-dag" onclick="switchFrameworkView('dag')">
+          ⚡ Xem Dagster (assets_workflow.py)
+        </button>
+      </div>
+
+      <!-- AIRFLOW VIEW -->
+      <div id="view-af" class="split-container">
+        <!-- Editor Column -->
+        <div class="editor-pane">
+          <div class="pane-header">
+            <span>📄 order_processing_dag.py (Di chuột vào từng dòng để xem vị trí trên Web UI)</span>
+            <span style="color: var(--cyan); font-weight: 600;">Hover để xem UI ➔</span>
+          </div>
+          <div class="code-lines">
+            <div class="code-row" onmouseenter="highlightAf('dag-header')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 1. Định nghĩa DAG</span><br>
+              <span style="color: #c084fc;">@dag</span>(<br>
+              &nbsp;&nbsp;dag_id=<span style="color: #a5f3fc;">"order_processing_airflow_dag"</span>,<br>
+              &nbsp;&nbsp;tags=[<span style="color: #86efac;">"migration"</span>, <span style="color: #86efac;">"demo"</span>],<br>
+              &nbsp;&nbsp;doc_md=__doc__<br>
+              )
+            </div>
+            <br>
+            <div class="code-row" onmouseenter="highlightAf('task-fetch')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 2. Task 1: Lấy dữ liệu lô đơn hàng</span><br>
+              <span style="color: #c084fc;">@task</span><br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">fetch_orders_batch</span>():<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> {<span style="color: #a5f3fc;">"orders"</span>: [...]}
+            </div>
+            <br>
+            <div class="code-row" onmouseenter="highlightAf('task-branch')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 3. Choice State: Rẽ nhánh</span><br>
+              <span style="color: #c084fc;">@task.branch</span><br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">check_batch_condition</span>(batch_info):<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> <span style="color: #a5f3fc;">"prepare_orders_for_mapping"</span>
+            </div>
+            <br>
+            <div class="code-row" onmouseenter="highlightAf('task-expand')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 4. Map State: Lặp song song từng đơn hàng</span><br>
+              <span style="color: #c084fc;">@task</span><br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">process_single_order</span>(order):<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> {<span style="color: #a5f3fc;">"final_price"</span>: order[<span style="color: #a5f3fc;">"amount"</span>] * 0.9}
+            </div>
+            <br>
+            <div class="code-row" onmouseenter="highlightAf('task-wiring')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 5. Nối dây bằng >> và .expand()</span><br>
+              mapped_orders = process_single_order.<span style="color: #38bdf8;">expand</span>(order=orders_list)<br>
+              summary_result = aggregate_results(mapped_orders)<br>
+              summary_result <span style="color: #f43f5e;">&gt;&gt;</span> finish
+            </div>
+          </div>
+        </div>
+
+        <!-- UI Simulation Column -->
+        <div class="ui-pane">
+          <div class="ui-mock-browser">
+            <div class="dot red"></div>
+            <div class="dot yellow"></div>
+            <div class="dot green"></div>
+            <div class="browser-url">http://localhost:8080/dags/order_processing_airflow_dag/graph</div>
+          </div>
+          <div class="ui-canvas">
+            <!-- 1. Header Card -->
+            <div id="sim-af-dag-header" class="sim-card">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 18px; font-weight: 800; color: #fff;">
+                  order_processing_airflow_dag
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <span style="background: #1e293b; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">migration</span>
+                  <span style="background: #1e293b; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">demo</span>
+                </div>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                Schedule: None | Status: Active | Owner: airflow
+              </p>
+            </div>
+
+            <!-- 2. Graph Canvas -->
+            <div style="background: #0a0f1d; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
+              <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 14px;">GRAPH VIEW (Mỗi task là 1 ô hình chữ nhật):</div>
+              <div style="display: flex; flex-direction: column; gap: 14px; align-items: center;">
+                
+                <!-- Node 1 -->
+                <div id="sim-af-task-fetch" class="g-node">
+                  <span style="color: #cbd5e1; font-weight: 600;">fetch_orders_batch</span>
+                  <span style="font-size: 10px; color: var(--green);">● success</span>
+                </div>
+                <div class="arrow-right">▼</div>
+
+                <!-- Node 2 -->
+                <div id="sim-af-task-branch" class="g-node">
+                  <span style="color: #cbd5e1; font-weight: 600;">check_batch_condition</span>
+                  <span style="font-size: 10px; color: var(--amber);">🔀 Branching Task</span>
+                </div>
+                <div class="arrow-right">▼</div>
+
+                <!-- Node 3: Expand Map -->
+                <div id="sim-af-task-expand" class="g-node">
+                  <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <span style="color: #cbd5e1; font-weight: 600;">process_single_order</span>
+                    <span style="background: #0284c7; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: bold;">[4]</span>
+                  </div>
+                  <span style="font-size: 10px; color: #38bdf8;">Dynamic Task Mapping (.expand)</span>
+                </div>
+                <div class="arrow-right">▼</div>
+
+                <!-- Node 4: Finish -->
+                <div id="sim-af-task-wiring" class="g-node" style="min-width: 100px;">
+                  <span style="color: #cbd5e1; font-weight: 600;">finish</span>
+                  <span style="font-size: 10px; color: var(--text-muted);">EmptyOperator</span>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Dynamic Tooltip -->
+            <div id="af-tooltip" class="tooltip-bubble">
+              💡 <strong>Giải thích:</strong> Hãy di chuột vào từng khối code bên trái để thấy chính xác dòng code đó biến thành phần tử nào trên giao diện Web của Airflow!
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DAGSTER VIEW -->
+      <div id="view-dag" class="split-container" style="display: none;">
+        <!-- Editor Column -->
+        <div class="editor-pane">
+          <div class="pane-header">
+            <span>📄 assets_workflow.py (Di chuột vào từng dòng code Dagster)</span>
+            <span style="color: var(--purple); font-weight: 600;">Hover để xem UI ➔</span>
+          </div>
+          <div class="code-lines">
+            <div class="code-row dag-hl" onmouseenter="highlightDag('dag-group')" onmouseleave="unhighlightDag()">
+              <span style="color: #6b7280;"># 1. Gom nhóm Assets thành 1 khung viền</span><br>
+              <span style="color: #c084fc;">@asset</span>(group_name=<span style="color: #a5f3fc;">"orders_pipeline"</span>)<br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">raw_orders_batch</span>():<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> [...]
+            </div>
+            <br>
+            <div class="code-row dag-hl" onmouseenter="highlightDag('dag-dep')" onmouseleave="unhighlightDag()">
+              <span style="color: #6b7280;"># 2. Nối dây tự động: Tên tham số = Tên Asset trước!</span><br>
+              <span style="color: #c084fc;">@asset</span>(group_name=<span style="color: #a5f3fc;">"orders_pipeline"</span>)<br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">validated_orders</span>(<span style="color: #f43f5e; font-weight: bold;">raw_orders_batch</span>):<br>
+              &nbsp;&nbsp;cleaned = [apply_discount(o) <span style="color: #f43f5e;">for</span> o <span style="color: #f43f5e;">in</span> raw_orders_batch]<br>
+            </div>
+            <br>
+            <div class="code-row dag-hl" onmouseenter="highlightDag('dag-metadata')" onmouseleave="unhighlightDag()">
+              <span style="color: #6b7280;"># 3. Ghi chỉ số Metadata trực quan lên Web UI</span><br>
+              &nbsp;&nbsp;metadata = {<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #a5f3fc;">"total_records"</span>: len(cleaned),<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #a5f3fc;">"vip_records"</span>: sum(1 <span style="color: #f43f5e;">for</span> o <span style="color: #f43f5e;">in</span> cleaned <span style="color: #f43f5e;">if</span> o[<span style="color: #a5f3fc;">"tier"</span>]==<span style="color: #a5f3fc;">"VIP"</span>),<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #a5f3fc;">"preview"</span>: MetadataValue.json(cleaned[:2])<br>
+              &nbsp;&nbsp;}<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> Output(cleaned, metadata=metadata)
+            </div>
+          </div>
+        </div>
+
+        <!-- Dagster UI Simulation Column -->
+        <div class="ui-pane">
+          <div class="ui-mock-browser">
+            <div class="dot red"></div>
+            <div class="dot yellow"></div>
+            <div class="dot green"></div>
+            <div class="browser-url">http://localhost:3000/assets?group=orders_pipeline</div>
+          </div>
+          <div class="ui-canvas">
+            <!-- Group Box -->
+            <div id="sim-dag-group" class="sim-card" style="border: 2px dashed rgba(168, 85, 247, 0.4); padding: 18px;">
+              <div style="font-size: 13px; font-weight: 800; color: var(--purple); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                📦 GROUP: orders_pipeline
+              </div>
+
+              <!-- Lineage Graph -->
+              <div style="display: flex; align-items: center; justify-content: space-around; gap: 10px;">
+                <div id="sim-dag-node-raw" class="g-node" style="border-radius: 8px;">
+                  <span style="font-size: 11px; color: var(--purple);">ASSET</span>
+                  <span style="font-weight: 700;">raw_orders_batch</span>
+                </div>
+                <div class="arrow-right" style="color: var(--purple);">➔</div>
+                <div id="sim-dag-node-val" class="g-node" style="border-radius: 8px;">
+                  <span style="font-size: 11px; color: var(--purple);">ASSET</span>
+                  <span style="font-weight: 700;">validated_orders</span>
+                </div>
+                <div class="arrow-right" style="color: var(--purple);">➔</div>
+                <div class="g-node" style="border-radius: 8px;">
+                  <span style="font-size: 11px; color: var(--purple);">ASSET</span>
+                  <span style="font-weight: 700;">batch_summary_...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metadata Sidebar Mockup -->
+            <div id="sim-dag-sidebar" class="sim-card" style="background: rgba(30, 41, 59, 0.7);">
+              <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+                📋 ASSET METADATA (validated_orders)
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+                <div style="background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">
+                  <span style="color: var(--text-muted);">total_records:</span>
+                  <span style="font-weight: bold; color: var(--cyan); float: right;">4</span>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">
+                  <span style="color: var(--text-muted);">vip_records:</span>
+                  <span style="font-weight: bold; color: var(--purple); float: right;">2</span>
+                </div>
+              </div>
+              <div style="margin-top: 10px; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; color: #a5f3fc;">
+                preview: [{"order_id": "ORD-101", "tier": "VIP"}, {"order_id": "ORD-102", "tier": "STD"}]
+              </div>
+            </div>
+
+            <div id="dag-tooltip" class="tooltip-bubble" style="border-color: var(--purple);">
+              💡 <strong>Giải thích:</strong> Dagster không quản lý chuỗi task; nó quản lý <strong>Tài sản Dữ liệu (Assets)</strong>. Di chuột vào code bên trái để xem cách Dagster tự động vẽ Data Lineage!
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: CÁCH NỐI NHAU -->
+    <section id="tab-connect" class="tab-content">
+      <div class="flow-card-grid">
+        <!-- Airflow Wiring -->
+        <div class="flow-column" style="border-top: 4px solid var(--cyan);">
+          <h3 style="font-size: 18px; color: var(--cyan);">🌪️ Cách Airflow Nối Các Task</h3>
+          <p style="font-size: 14px; color: #cbd5e1;">
+            Trong code của bạn: <code>branch_choice >> skipped_result >> finish</code>
+          </p>
+          <div style="background: #0d1117; padding: 18px; border-radius: 12px; font-family: var(--font-mono); font-size: 13px; line-height: 1.6;">
+            1. Dùng toán tử <span style="color: #f43f5e; font-weight: bold;">&gt;&gt;</span> (Bitwise Shift) để khai báo thứ tự trước sau.<br><br>
+            2. <strong>Luân chuyển dữ liệu:</strong> Task 1 <code>return</code> cái gì thì bị Worker chạy lệnh SQL:<br>
+            <span style="color: #a5f3fc;">INSERT INTO xcom (val) VALUES ('{"orders": ...}')</span><br>
+            nhét vào Database PostgreSQL.<br><br>
+            3. Task 2 muốn nhận dữ liệu phải gọi ngầm <code>ti.xcom_pull()</code> để kéo từ Database ra!
+          </div>
+          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid var(--amber); padding: 12px; border-radius: 8px; font-size: 13px; color: #fde68a;">
+            ⚠️ <strong>Hạn chế:</strong> Nối dây là "mù dữ liệu". Airflow chỉ biết Task B chạy sau Task A, chứ không kiểm tra xem Task A có trả về đúng kiểu dữ liệu Task B cần hay không.
+          </div>
+        </div>
+
+        <!-- Dagster Wiring -->
+        <div class="flow-column" style="border-top: 4px solid var(--purple);">
+          <h3 style="font-size: 18px; color: var(--purple);">⚡ Cách Dagster Nối Các Asset</h3>
+          <p style="font-size: 14px; color: #cbd5e1;">
+            Trong code của bạn: <code>def validated_orders(raw_orders_batch):</code>
+          </p>
+          <div style="background: #0d1117; padding: 18px; border-radius: 12px; font-family: var(--font-mono); font-size: 13px; line-height: 1.6;">
+            1. <strong>HOÀN TOÀN KHÔNG DÙNG TOÁN TỬ &gt;&gt;</strong>.<br><br>
+            2. Dagster đọc tên tham số: Thấy hàm <code>validated_orders</code> có đối số <code>raw_orders_batch</code> trùng với tên Asset 1.<br><br>
+            3. <strong>Luân chuyển dữ liệu:</strong> <code>IOManager</code> tự động cất đối tượng vào MinIO/Disk. Đến lượt Asset 2, IOManager tự nạp file vào tham số hàm!
+          </div>
+          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--green); padding: 12px; border-radius: 8px; font-size: 13px; color: #a7f3d0;">
+            🌟 <strong>Ưu thế vượt trội:</strong> Type-safe 100%! Đồ thị phụ thuộc dữ liệu (Data Lineage) sinh ra tự nhiên, chuẩn Software Engineering.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: UNDER THE HOOD SIMULATOR -->
+    <section id="tab-lifecycle" class="tab-content">
+      <div class="sim-controls">
+        <button class="sim-btn" onclick="nextSimStep()">
+          ▶ Bước Tiếp Theo (Chạy Ngầm)
+        </button>
+        <div class="sim-stepper">
+          <span class="step-pill current" id="pill-1" onclick="jumpSimStep(1)">Bước 1: Trigger Job</span>
+          <span class="step-pill" id="pill-2" onclick="jumpSimStep(2)">Bước 2: Task 1 Run & Lưu Data</span>
+          <span class="step-pill" id="pill-3" onclick="jumpSimStep(3)">Bước 3: Task 2 Nhận Data</span>
+          <span class="step-pill" id="pill-4" onclick="jumpSimStep(4)">Bước 4: Hoàn Thành</span>
+        </div>
+      </div>
+
+      <div class="sim-stage">
+        <div id="sim-step-content" style="width: 100%; max-width: 900px; font-size: 15px; line-height: 1.8;">
+          <!-- Content dynamically rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: MATRIX AUTO VS MANUAL -->
+    <section id="tab-matrix" class="tab-content">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>Tính Năng / Nghiệp Vụ</th>
+            <th>Apache Airflow</th>
+            <th>Dagster</th>
+            <th>Bản Chất Vì Sao</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Vẽ Sơ Đồ Graph View</strong></td>
+            <td><span class="badge-manual">Bạn phải tự cấu hình</span> (viết toán tử <code>&gt;&gt;</code>)</td>
+            <td><span class="badge-auto">Framework tự lo</span> (đọc tên tham số hàm)</td>
+            <td>Dagster quản lý dữ liệu (Asset-Centric) nên tự hiểu quan hệ cha-con. Airflow chỉ quản lý thứ tự task.</td>
+          </tr>
+          <tr>
+            <td><strong>Lưu & Chuyển Dữ Liệu Lớn (Ảnh, DataFrame)</strong></td>
+            <td><span class="badge-manual">Bạn phải tự viết code</span> upload S3</td>
+            <td><span class="badge-auto">Framework tự lo</span> qua <code>IOManager</code></td>
+            <td>XCom của Airflow ép vào Postgres. IOManager của Dagster được thiết kế từ đầu cho Object Storage.</td>
+          </tr>
+          <tr>
+            <td><strong>Chống Lỗi Skip Khi Rẽ Nhánh (Choice State)</strong></td>
+            <td><span class="badge-manual">Bạn phải nhớ cấu hình</span> <code>trigger_rule</code></td>
+            <td><span class="badge-auto">Framework tự lo</span> (tự hiểu nhánh bỏ qua)</td>
+            <td>Airflow mặc định coi upstream không chạy là lỗi hoặc skip. Dagster hỗ trợ Multi-Output tự nhiên.</td>
+          </tr>
+          <tr>
+            <td><strong>Xem Preview Dữ Liệu & Chỉ Số Trên Web</strong></td>
+            <td><span class="badge-manual">Không hỗ trợ sẵn</span> (chỉ có log đen trắng)</td>
+            <td><span class="badge-auto">Framework tự lo</span> khi truyền <code>metadata={...}</code></td>
+            <td>Dagster có sẵn Asset Catalog, hiểu được con số doanh thu, số dòng, độ tin cậy.</td>
+          </tr>
+          <tr>
+            <td><strong>Chạy Test Pytest Nhanh Trong 1.9s</strong></td>
+            <td><span class="badge-manual">Cực khó</span> (phải mock cả cụm database)</td>
+            <td><span class="badge-auto">Framework tự lo</span> (hàm <code>execute_in_process</code>)</td>
+            <td>Hàm của Dagster là hàm Python thuần túy. Hàm của Airflow bị bọc chặt vào runtime của cluster.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    // Tab switching
+    function switchMainTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // Sub switch Airflow vs Dagster
+    function switchFrameworkView(fw) {
+      const btnAf = document.getElementById('btn-show-af');
+      const btnDag = document.getElementById('btn-show-dag');
+      const viewAf = document.getElementById('view-af');
+      const viewDag = document.getElementById('view-dag');
+
+      if (fw === 'af') {
+        btnAf.className = 'sub-btn active-af';
+        btnDag.className = 'sub-btn';
+        viewAf.style.display = 'grid';
+        viewDag.style.display = 'none';
+      } else {
+        btnAf.className = 'sub-btn';
+        btnDag.className = 'sub-btn active-dag';
+        viewAf.style.display = 'none';
+        viewDag.style.display = 'grid';
+      }
+    }
+
+    // Airflow Highlight Interactivity
+    const afTooltips = {
+      'dag-header': '<strong>Dòng @dag(dag_id="..."):</strong> Tạo ra tiêu đề lớn của DAG và các Tag nhãn [migration], [demo] trên thanh điều hướng Airflow Web UI.',
+      'task-fetch': '<strong>Hàm @task def fetch_orders_batch():</strong> Tên hàm biến thành hộp chữ nhật đầu tiên mang tên "fetch_orders_batch" trên Graph View.',
+      'task-branch': '<strong>Hàm @task.branch def check_batch_condition():</strong> Biến thành node rẽ nhánh. Khi chạy, nó trả về tên task nào thì Airflow kích hoạt task đó, bỏ qua nhánh còn lại.',
+      'task-expand': '<strong>Hàm @task def process_single_order():</strong> Vì dùng .expand(), trên UI góc của ô này có ký hiệu [4], biểu thị vòng lặp 4 task con song song!',
+      'task-wiring': '<strong>Toán tử >> và .expand():</strong> Đây là code vẽ mũi tên nối các ô lại với nhau trên màn hình Graph View.'
+    };
+
+    function highlightAf(targetId) {
+      document.querySelectorAll('.sim-card, .g-node').forEach(el => el.classList.remove('active-target'));
+      const target = document.getElementById(`sim-af-${targetId}`);
+      if (target) target.classList.add('active-target');
+      document.getElementById('af-tooltip').innerHTML = afTooltips[targetId] || '';
+    }
+
+    function unhighlightAf() {
+      document.querySelectorAll('.sim-card, .g-node').forEach(el => el.classList.remove('active-target'));
+      document.getElementById('af-tooltip').innerHTML = '💡 <strong>Giải thích:</strong> Di chuột vào từng khối code bên trái để xem vị trí tương ứng trên giao diện Airflow!';
+    }
+
+    // Dagster Highlight Interactivity
+    const dagTooltips = {
+      'dag-group': '<strong>group_name="orders_pipeline":</strong> Tự động gom tất cả các Asset cùng nhóm vào một khung chữ nhật nét đứt màu tím trên UI.',
+      'dag-dep': '<strong>def validated_orders(raw_orders_batch):</strong> Tên tham số trùng với tên Asset trước ➔ Dagster TỰ ĐỘNG vẽ mũi tên nối Lineage mà không cần toán tử >>!',
+      'dag-metadata': '<strong>metadata={"total_records": ...}:</strong> Biến thành bảng số liệu và bảng JSON Preview hiển thị trực tiếp ở sidebar bên phải của UI.'
+    };
+
+    function highlightDag(targetId) {
+      document.querySelectorAll('.sim-card, .g-node').forEach(el => el.classList.remove('active-target-dag'));
+      if (targetId === 'dag-group') {
+        document.getElementById('sim-dag-group').classList.add('active-target-dag');
+      } else if (targetId === 'dag-dep') {
+        document.getElementById('sim-dag-node-raw').classList.add('active-target-dag');
+        document.getElementById('sim-dag-node-val').classList.add('active-target-dag');
+      } else if (targetId === 'dag-metadata') {
+        document.getElementById('sim-dag-sidebar').classList.add('active-target-dag');
+      }
+      document.getElementById('dag-tooltip').innerHTML = dagTooltips[targetId] || '';
+    }
+
+    function unhighlightDag() {
+      document.querySelectorAll('.sim-card, .g-node').forEach(el => el.classList.remove('active-target-dag'));
+      document.getElementById('dag-tooltip').innerHTML = '💡 <strong>Giải thích:</strong> Di chuột vào từng khối code bên trái để xem cách Dagster tự động vẽ Data Lineage!';
+    }
+
+    // Simulator Logic
+    let currentSim = 1;
+    const simSteps = [
+      {
+        title: "BƯỚC 1: KÍCH HOẠT JOB (TRIGGER RUN)",
+        af: "Người dùng bấm nút 'Trigger DAG' trên Web UI ➔ Webserver tạo 1 bản ghi vào bảng <code>dag_run</code> trong PostgreSQL (state = 'queued').<br>Scheduler của Airflow quét thấy, gắp Task đầu tiên <code>fetch_orders_batch</code> đẩy vào hàng đợi Redis Queue.",
+        dag: "Người dùng bấm 'Materialize' ➔ Webserver gửi bản tin gRPC sang container <strong>Code Location</strong>.<br>Dagster Daemon tạo bản ghi trong Postgres và gọi K8s Run Launcher để khởi tạo 1 Pod độc lập riêng cho Run này."
+      },
+      {
+        title: "BƯỚC 2: TASK 1 CHẠY VÀ LƯU DỮ LIỆU",
+        af: "Worker Airflow nhặt task từ Redis, chạy hàm <code>fetch_orders_batch()</code>.<br>Hàm trả về danh sách 4 đơn hàng ➔ Worker tự chạy lệnh SQL: <br><code style='color:#a5f3fc;'>INSERT INTO xcom (val) VALUES ('[Alice, Bob, ...]')</code> nhét thẳng 4 đơn hàng vào bảng <code>xcom</code> trong PostgreSQL!",
+        dag: "Pod chạy hàm <code>raw_orders_batch()</code>.<br>Hàm trả về danh sách 4 đơn hàng ➔ <strong>IOManager</strong> tự động bắt lấy, cất vào MinIO (hoặc đĩa) dạng file parquet.<br>PostgreSQL hoàn toàn sạch sẽ, chỉ nhận đúng 1 dòng sự kiện: <em>'Asset raw_orders_batch materialized'</em>."
+      },
+      {
+        title: "BƯỚC 3: TASK 2 TIẾP NHẬN DỮ LIỆU",
+        af: "Scheduler quét thấy Task 1 xong, gắp tiếp Task 2 đẩy vào Redis.<br>Worker Task 2 muốn có dữ liệu 4 đơn hàng phải chạy câu lệnh: <br><code style='color:#a5f3fc;'>SELECT val FROM xcom WHERE task_id='fetch_orders_batch'</code> để lôi dữ liệu từ PostgreSQL ra giải nén lại!",
+        dag: "Pod chuẩn bị chạy hàm <code>validated_orders(raw_orders_batch)</code>.<br><strong>IOManager</strong> tự động mở file trên MinIO ra, deserialize thành list Python và nạp thẳng vào tham số đầu vào của hàm. Hàm chỉ việc tính toán chiết khấu!"
+      },
+      {
+        title: "BƯỚC 4: KẾT THÚC VÀ HIỂN THỊ KẾT QUẢ",
+        af: "Toàn bộ DAG hoàn thành. Giao diện Grid View chuyển sang màu xanh lá.<br>Nếu muốn xem kết quả đơn hàng, bạn phải vào tab 'XCom' trong Admin để đọc chuỗi JSON trong bảng.",
+        dag: "Asset Graph chuyển sang màu xanh lá. Dữ liệu mới nhất được cập nhật vào Asset Catalog.<br>Bấm vào Asset <code>validated_orders</code>, bạn thấy ngay con số <code>total_records: 4</code>, <code>vip_records: 2</code> và bảng xem trước JSON trực quan!"
+      }
+    ];
+
+    function renderSimStep() {
+      const data = simSteps[currentSim - 1];
+      document.querySelectorAll('.step-pill').forEach((p, idx) => {
+        p.classList.toggle('current', idx === (currentSim - 1));
+      });
+
+      document.getElementById('sim-step-content').innerHTML = `
+        <h3 style="color: var(--cyan); font-size: 20px; font-weight: 800; margin-bottom: 20px; text-align: center;">
+          ${data.title}
+        </h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid var(--cyan); border-radius: 12px; padding: 20px;">
+            <div style="color: var(--cyan); font-weight: 700; margin-bottom: 10px; font-size: 16px;">
+              🌪️ BÊN DƯỚI NẮP CA-PÔ AIRFLOW:
+            </div>
+            <div style="color: #cbd5e1; font-size: 14px; line-height: 1.7;">
+              ${data.af}
+            </div>
+          </div>
+          <div style="background: rgba(168, 85, 247, 0.08); border: 1px solid var(--purple); border-radius: 12px; padding: 20px;">
+            <div style="color: var(--purple); font-weight: 700; margin-bottom: 10px; font-size: 16px;">
+              ⚡ BÊN DƯỚI NẮP CA-PÔ DAGSTER:
+            </div>
+            <div style="color: #cbd5e1; font-size: 14px; line-height: 1.7;">
+              ${data.dag}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function nextSimStep() {
+      currentSim++;
+      if (currentSim > simSteps.length) currentSim = 1;
+      renderSimStep();
+    }
+
+    function jumpSimStep(step) {
+      currentSim = step;
+      renderSimStep();
+    }
+
+    // Initialize simulator
+    renderSimStep();
+  </script>
+</body>
+</html>

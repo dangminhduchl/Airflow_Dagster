@@ -1,0 +1,12 @@
+{
+  "venvPath": "/home/ducdm3/.pyenv/versions",
+  "venv": "3.12.0",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": [
+        "airflow_demo/dags"
+      ]
+    }
+  ]
+}
