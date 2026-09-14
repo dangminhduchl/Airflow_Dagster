@@ -51,7 +51,7 @@
 
 ## 3. SO SÁNH TRỰC DIỆN CODE CÁC PATTERN TỪ STEP FUNCTIONS
 
-Hai mã nguồn mẫu thực tế đã được xây dựng và kiểm thử trong thư mục [airflow_demo](file:///home/ducdm3/Self_training/AirFlow_Dagster/airflow_demo) và [dagster_demo](file:///home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo).
+Hai mã nguồn mẫu thực tế đã được xây dựng và kiểm thử trong thư mục [airflow_demo](file:///home/duc/SelftTraining/Airflow_Dagster/airflow_demo) và [dagster_demo](file:///home/duc/SelftTraining/Airflow_Dagster/dagster_demo).
 
 ### 3.1. Rẽ nhánh có điều kiện (Choice State / If-Else)
 
@@ -157,6 +157,23 @@ aggregate_results(processed.collect())
 
 ---
 
+### 3.5. Kiểm định chất lượng dữ liệu & Rẽ nhánh đồ thị (Data Quality & Branching Lineage)
+
+#### Apache Airflow:
+Airflow giải quyết điều kiện rẽ nhánh ở cấp độ Task:
+* Dùng `@task.branch` để chọn task thực thi tiếp theo.
+* Khi chạy, các task không được chọn sẽ mang trạng thái `SKIPPED` (màu hồng trên Graph View).
+* Không có cơ chế bản địa để hiển thị kết quả kiểm định dữ liệu trực tiếp trên UI (thường phải dùng thư viện ngoài như Great Expectations hoặc tự ghi log).
+
+#### Dagster:
+Dagster đưa Data Quality và Lineage thành công dân hạng nhất:
+* **`@asset_check`:** Gắn trực tiếp lên Asset để kiểm tra tính toàn vẹn (ví dụ phát hiện đơn Soft-Delete `is_deleted`). Dagster hiển thị ngay **Huy hiệu Badge cảnh báo (WARN/ERROR)** trực tiếp trên Asset Catalog.
+* **Đồ thị rẽ nhánh 3 Asset độc lập:** Từ `raw_orders_batch`, Dagster rẽ thành 3 luồng tài sản chuyên biệt:
+  * `vip_orders` (Áp dụng chính sách VIP, giảm 10%, voucher 100$)
+  * `standard_orders` (Giá chuẩn)
+  * `quarantined_orders` (Cách ly đơn hủy/xóa để phục vụ kiểm toán)
+  * Hội tụ về `batch_financial_summary` (Tổng hợp doanh thu $4,480).
+
 ---
 
 ## 4. TRẢI NGHIỆM LẬP TRÌNH & KIỂM THỬ (DEVELOPER EXPERIENCE)
@@ -173,7 +190,7 @@ Thời gian Feedback Loop khi sửa 1 dòng code:
 ```
 
 ### Tại sao Dagster vượt trội về Testing? (Bản chất kỹ thuật)
-Trong [test_order_processing.py](file:///home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo/tests/test_order_processing.py), bạn có thể:
+Trong [test_order_processing.py](file:///home/duc/SelftTraining/Airflow_Dagster/dagster_demo/tests/test_order_processing.py), bạn có thể:
 1. **Test từng Op đơn lẻ như 1 hàm Python thuần túy:**
    ```python
    def test_single_order():

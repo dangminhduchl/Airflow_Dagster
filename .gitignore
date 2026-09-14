@@ -1,0 +1,18 @@
+# Virtual environment
+.venv/
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Dagster temporary directories
+.tmp_dagster_home_*
+dagster_demo/.tmp_dagster_home_*
+
+# Airflow logs and temporary files
+airflow_demo/logs/
+*.pid

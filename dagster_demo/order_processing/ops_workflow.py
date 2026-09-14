@@ -1,127 +1,130 @@
 """
-Order Processing Workflow with Dagster (Ops & Jobs approach)
+Intelligent Document Processing (IDP) Workflow with Dagster (Ops & Jobs approach)
 Mô phỏng 1-1 kiến trúc AWS Step Functions:
-1. Task (Fetch Data)
-2. Choice State (If-Else: Check batch validity)
-3. Dynamic Map State (Loop qua từng order để xử lý song song)
-4. Aggregation / Summary
+1. Task (Fetch PDF Batch)
+2. Dynamic Map State (Loop fan-out từng file PDF để OCR & AI Extraction)
+3. Choice State:
+   - If confidence < 0.80 -> Nhánh Human Review Quarantine
+   - If doc_type == 'INVOICE' -> Nhánh ERP Finance
+   - If doc_type == 'CONTRACT' -> Nhánh Legal Compliance
+   - If doc_type == 'ID_CARD' -> Nhánh eKYC Onboarding
+4. Fan-in Aggregation (Tổng hợp kết quả toàn lô)
 """
 from typing import List, Dict, Any
-from dagster import op, job, DynamicOut, DynamicOutput, Out, Output
-
-
-@op(out={"orders": Out(list), "is_active": Out(bool)})
-def fetch_orders_batch():
-    """Tương đương Task State: Lấy danh sách các đơn hàng cần xử lý."""
-    batch_data = [
-        {"order_id": "ORD-001", "customer": "Alice", "amount": 1500, "item_count": 3},
-        {"order_id": "ORD-002", "customer": "Bob", "amount": 250, "item_count": 1},
-        {"order_id": "ORD-003", "customer": "Charlie", "amount": 3200, "item_count": 5},
-        {"order_id": "ORD-004", "customer": "David", "amount": 80, "item_count": 1},
-    ]
-    is_active = True
-    return batch_data, is_active
-
-
-@op(
-    out={
-        "process_branch": Out(list, is_required=False),
-        "skip_branch": Out(str, is_required=False),
-    }
-)
-def check_batch_condition(orders: list, is_active: bool):
-    """
-    Tương đương Choice State (If-Else):
-    - Nếu hệ thống active và batch có dữ liệu -> Rẽ nhánh xử lý
-    - Ngược lại -> Rẽ nhánh skip / alert
-    """
-    if is_active and len(orders) > 0:
-        print(f"[CONDITION] Batch hợp lệ với {len(orders)} đơn hàng. Rẽ nhánh xử lý.")
-        yield Output(orders, output_name="process_branch")
-    else:
-        print("[CONDITION] Batch rỗng hoặc hệ thống bảo trì. Rẽ nhánh bỏ qua.")
-        yield Output("Batch is empty or inactive", output_name="skip_branch")
+from dagster import op, job, DynamicOut, DynamicOutput
 
 
 @op
-def log_skipped_batch(reason: str):
-    """Xử lý khi nhánh If-Else đi vào trường hợp Skip."""
-    print(f"[ALERT] Bỏ qua batch xử lý: {reason}")
-    return {"status": "SKIPPED", "reason": reason}
+def fetch_pdf_batch() -> List[Dict[str, Any]]:
+    """Tương đương Task State: Nhận danh sách các file PDF cần xử lý."""
+    return [
+        {
+            "doc_id": "DOC-001",
+            "file_name": "hoa_don_vat_dich_vu_cloud.pdf",
+            "text": "HOA DON VAT - Cty TNHH Dich Vu May - MST: 0101234567 - Tong tien: 45.000.000 VND",
+        },
+        {
+            "doc_id": "DOC-002",
+            "file_name": "hop_dong_hop_tac_techcorp.pdf",
+            "text": "HOP DONG DICH VU - Doi tac: TechCorp JSC - Thoi han: 12 thang - Phat: 8%",
+        },
+        {
+            "doc_id": "DOC-003",
+            "file_name": "can_cuoc_cong_dan_nguyen_van_a.pdf",
+            "text": "CAN CUOC CONG DAN - So: 001201009999 - Ho ten: NGUYEN VAN A - Nam sinh: 1995",
+        },
+        {
+            "doc_id": "DOC-004",
+            "file_name": "bien_lai_scan_mo_rach.pdf",
+            "text": "??? [Corrupted scan / Blurry text] ???",
+        },
+    ]
 
 
 @op(out=DynamicOut())
-def fan_out_orders(orders: List[Dict[str, Any]]):
+def fan_out_documents(documents: List[Dict[str, Any]]):
     """
     Tương đương Dynamic Map State (Loop fan-out):
-    Tách danh sách orders thành từng dynamic output để xử lý độc lập/song song.
+    Tách từng file PDF thành các dynamic output để chạy song song.
     """
-    for order in orders:
-        # mapping_key phải là chuỗi định danh duy nhất không chứa ký tự đặc biệt
-        key = order["order_id"].replace("-", "_")
-        yield DynamicOutput(value=order, mapping_key=key)
+    for doc in documents:
+        key = doc["doc_id"].replace("-", "_")
+        yield DynamicOutput(value=doc, mapping_key=key)
 
 
 @op
-def process_single_order(order: Dict[str, Any]) -> Dict[str, Any]:
+def ocr_and_ai_detect_document(doc: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Tương đương Task bên trong Iterator của Map State:
-    Xử lý logic cho từng đơn hàng (If-else logic giá trị đơn).
+    Tương đương Task bên trong Map State:
+    Mô phỏng OCR + Gọi AI Detect & phân loại Choice State đa nhánh.
     """
-    order_id = order["order_id"]
-    amount = order["amount"]
+    doc_id = doc["doc_id"]
+    file_name = doc["file_name"]
 
-    # Condition If-Else cục bộ cho từng đơn hàng
-    if amount >= 1000:
-        discount = amount * 0.1  # Giảm giá 10% cho đơn VIP
-        tier = "VIP"
-    else:
-        discount = 0.0
-        tier = "STANDARD"
+    if doc_id == "DOC-001":
+        classification = "INVOICE"
+        confidence = 0.96
+        action = "ROUTED_TO_ERP_ORACLE"
+        detail = "Hóa đơn VAT 45,000,000 VND (Cần CFO duyệt)"
+    elif doc_id == "DOC-002":
+        classification = "CONTRACT"
+        confidence = 0.92
+        action = "ROUTED_TO_LEGAL_VAULT"
+        detail = "Hợp đồng TechCorp 12 tháng (Đặt lịch gia hạn)"
+    elif doc_id == "DOC-003":
+        classification = "ID_CARD"
+        confidence = 0.98
+        action = "ROUTED_TO_EKYC_CORE"
+        detail = "CCCD Nguyễn Văn A - Tự động mở tài khoản"
+    else:  # DOC-004
+        classification = "UNREADABLE"
+        confidence = 0.35
+        action = "QUARANTINED_HUMAN_REVIEW"
+        detail = "File mờ, độ tin cậy thấp (35%) -> Cần chuyên viên kiểm tra tay"
 
-    final_price = amount - discount
-    print(f"[PROCESS] Đơn {order_id} ({tier}): Gốc={amount}$, Giảm={discount}$, Cuối={final_price}$")
+    print(f"[CHOICE STATE ROUTING] {doc_id} ({file_name}): Phân loại={classification} ({confidence * 100:.0f}%) -> {action} ({detail})")
 
     return {
-        "order_id": order_id,
-        "customer": order["customer"],
-        "tier": tier,
-        "final_price": final_price,
-        "status": "COMPLETED",
+        "doc_id": doc_id,
+        "file_name": file_name,
+        "classification": classification,
+        "confidence": confidence,
+        "action": action,
+        "detail": detail,
+        "is_quarantined": confidence < 0.80,
     }
 
 
 @op
-def aggregate_results(processed_orders: List[Dict[str, Any]]) -> Dict[str, Any]:
+def aggregate_document_results(processed_docs: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Tương đương bước gom kết quả (Fan-in) sau khi Map State hoàn thành.
+    Tương đương bước gom kết quả (Fan-in) sau khi xử lý AI xong.
     """
-    total_revenue = sum(item["final_price"] for item in processed_orders)
-    vip_count = sum(1 for item in processed_orders if item["tier"] == "VIP")
+    auto_processed = [d for d in processed_docs if not d["is_quarantined"]]
+    quarantined = [d for d in processed_docs if d["is_quarantined"]]
 
     summary = {
-        "total_orders": len(processed_orders),
-        "vip_orders": vip_count,
-        "total_revenue": total_revenue,
-        "status": "BATCH_SUCCESS",
+        "total_documents": len(processed_docs),
+        "auto_processed_count": len(auto_processed),
+        "quarantined_count": len(quarantined),
+        "invoices": sum(1 for d in processed_docs if d["classification"] == "INVOICE"),
+        "contracts": sum(1 for d in processed_docs if d["classification"] == "CONTRACT"),
+        "ekyc": sum(1 for d in processed_docs if d["classification"] == "ID_CARD"),
+        "status": "BATCH_PROCESSED_SUCCESSFULLY",
     }
-    print(f"[SUMMARY] Tổng kết Batch: {summary}")
+    print("=" * 60)
+    print(f"[BATCH REPORT] Tổng kết xử lý tài liệu OCR & AI:")
+    print(f" - Tổng file: {summary['total_documents']}")
+    print(f" - Tự động định tuyến thành công: {summary['auto_processed_count']}")
+    print(f" - Cách ly cần kiểm tra thủ công: {summary['quarantined_count']}")
+    print("=" * 60)
     return summary
 
 
 @job
-def order_processing_job():
-    """
-    Định nghĩa luồng hoàn chỉnh kết hợp:
-    Fetch -> If/Else (Choice) -> Dynamic Loop (Map) -> Aggregate (Fan-in)
-    """
-    orders, is_active = fetch_orders_batch()
-    process_branch, skip_branch = check_batch_condition(orders, is_active)
-
-    # Nhánh Skip:
-    log_skipped_batch(skip_branch)
-
-    # Nhánh Process (Loop qua dynamic outputs):
-    dynamic_orders = fan_out_orders(process_branch)
-    processed = dynamic_orders.map(process_single_order)
-    aggregate_results(processed.collect())
+def document_processing_job():
+    """Định nghĩa luồng Ops hoàn chỉnh cho OCR & AI Document Processing."""
+    docs = fetch_pdf_batch()
+    dynamic_docs = fan_out_documents(docs)
+    processed = dynamic_docs.map(ocr_and_ai_detect_document)
+    aggregate_document_results(processed.collect())

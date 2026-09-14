@@ -2,6 +2,7 @@
 set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="$DIR/.venv/bin:$PATH"
 export AIRFLOW_HOME="$DIR/airflow_demo"
 export AIRFLOW__CORE__DAGS_FOLDER="$DIR/airflow_demo/dags"
 export AIRFLOW__CORE__LOAD_EXAMPLES=False
@@ -15,7 +16,7 @@ echo "=========================================================="
 echo "Lưu ý: Mật khẩu admin sẽ hiển thị bên dưới khi Airflow khởi động lần đầu."
 echo ""
 
-airflow standalone
+"$DIR/.venv/bin/airflow" standalone
 # Đường dẫn Web UI: http://localhost:8080
 # Username: admin
 # Password: qWG7XMuYzxgAvGhq

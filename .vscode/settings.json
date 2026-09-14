@@ -1,9 +1,9 @@
 {
-  "python.defaultInterpreterPath": "/home/ducdm3/.pyenv/versions/3.12.0/bin/python",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
   "python.analysis.extraPaths": [
-    "/home/ducdm3/Self_training/AirFlow_Dagster",
-    "/home/ducdm3/Self_training/AirFlow_Dagster/airflow_demo/dags",
-    "/home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo"
+    "${workspaceFolder}",
+    "${workspaceFolder}/airflow_demo/dags",
+    "${workspaceFolder}/dagster_demo"
   ],
   "python.analysis.indexing": true,
   "python.analysis.packageIndexDepths": [
