@@ -10,4 +10,4 @@ echo "  Web UI: http://localhost:3000"
 echo "=========================================================="
 echo ""
 
-dagster dev -m order_processing
+dagster dev -f definitions.py

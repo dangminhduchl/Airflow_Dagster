@@ -1,22 +1,18 @@
-# Bộ Demo & Hướng Dẫn: Airflow vs. Dagster (Thay Thế AWS Step Functions Trên On-Premise)
+# 🚀 Bộ Demo & So Sánh Kỹ Thuật: Apache Airflow vs. Dagster
 
-Thư mục này chứa đầy đủ:
-1. **Dàn ý bài thuyết trình** & **Tài liệu kỹ thuật so sánh sâu**.
-2. **Mã nguồn Demo hoàn chỉnh** cho cả **Apache Airflow** và **Dagster**.
-3. Các pattern cốt lõi của AWS Step Functions:
-   * **Task Execution** (Tuần tự)
-   * **Choice State (If-Else)** (Rẽ nhánh điều kiện)
-   * **Map State (Loop song song)** (Dynamic Task Mapping / Dynamic Output)
-   * **Fan-in Aggregation** (Gom kết quả sau vòng lặp)
+Dự án này xây dựng **CÙNG MỘT BÀI TOÁN KINH DOANH THỰC TẾ (100% UNIFIED BUSINESS LOGIC)** trên cả hai nền tảng:
+👉 **Xử lý File PDF Đa Hóa Đơn & Kiểm Định Tài Chính (Multi-Page Invoice PDF Processing & Financial Audit)**.
+
+Mục tiêu chính: Giúp người xem nhìn thấy trực quan sự đối lập giữa **Tư duy Quản lý Task (Task-Driven của Airflow)** và **Tư duy Quản lý Tài sản Dữ liệu (Data-Driven / Asset-Driven của Dagster)** trên cùng một tập dữ liệu đầu vào và đầu ra.
 
 ---
 
-## 📂 Cấu Trúc Thư Mục
+## 📂 Cấu Trúc Thư Mục Tinh Gọn
 
 ```text
 AirFlow_Dagster/
-├── DOCS_Y_TUONG_VA_CAC_BUOC_DU_AN.md  # 📌 Tài liệu ý tưởng & giải thích luồng 4 bước chi tiết
-├── SO_SANH_AIRFLOW_VS_DAGSTER.md      # Tài liệu so sánh chuyên sâu (Bảng đánh giá, Code, DevX, Ops)
+├── DOCS_Y_TUONG_VA_CAC_BUOC_DU_AN.md  # 📌 Tài liệu chi tiết: Ý tưởng, luồng 4 bước & so sánh 2 góc nhìn
+├── SO_SANH_AIRFLOW_VS_DAGSTER.md      # Tài liệu so sánh chuyên sâu (DevX, Ops, Resource, Testing)
 ├── presentation_outline.md            # Dàn ý bài thuyết trình (12 slide + Speaker notes)
 ├── comparison_and_migration_guide.md  # Hướng dẫn kỹ thuật chuyển đổi từ Step Functions sang On-Prem K8s
 ├── README.md                          # Tài liệu tổng quan
@@ -25,59 +21,59 @@ AirFlow_Dagster/
 │
 ├── airflow_demo/
 │   └── dags/
-│       └── order_processing_dag.py    # Airflow DAG (TaskFlow API + Branching + .expand() loop)
+│       └── invoice_multipage_pdf_dag.py   # Airflow DAG (TaskFlow API + @task.branch + .expand() loop)
 │
 └── dagster_demo/
-    ├── order_processing/
-    │   ├── ops_workflow.py            # Dagster Job/Ops (Mô phỏng 1-1 Step Functions)
-    │   └── assets_workflow.py         # Dagster Software-Defined Assets (SDA hiện đại)
+    ├── definitions.py                 # Dagster unified definitions
+    ├── invoice_processing/
+    │   ├── __init__.py                # Module definitions
+    │   └── assets.py                  # Dagster Software-Defined Assets + 3 Financial @asset_checks
     └── tests/
-        └── test_order_processing.py   # Unit test bằng pytest (Đã pass 100%)
+        └── test_invoice_processing.py # Unit tests tự động bằng pytest (Pass 100%)
 ```
 
 ---
 
-## 🚀 Hướng Dẫn Chạy Demo
+## 💡 Tóm Tắt Bài Toán Xử Lý Hóa Đơn
 
-### 1. Chạy Apache Airflow (Chế độ Standalone - Không cần Docker)
-
-Airflow đã được cài đặt sẵn. Để khởi động Airflow Web UI:
-
-```bash
-cd /home/ducdm3/Self_training/AirFlow_Dagster
-./run_airflow_standalone.sh
-```
-
-* **Giao diện Web UI:** Mở trình duyệt tại `http://localhost:8080`
-* Tài khoản & Mật khẩu Admin: Sẽ được in tự động trên màn hình terminal khi chạy lần đầu.
-* DAG xuất hiện trên giao diện: `order_processing_airflow_dag`
+* **File PDF đầu vào (`chung_tu_dau_vao_thang_3.pdf`)**: 4 trang gồm:
+  1. *Trang 1*: Hóa đơn điện tử VAT (50tr + 5tr VAT = 55tr).
+  2. *Trang 2*: Hóa đơn Tiền điện EVN (1.85tr).
+  3. *Trang 3*: Hóa đơn Vé máy bay công tác phí (3.2tr).
+  4. *Trang 4*: Biên lai bán lẻ không có MST (150k - cảnh báo không khấu trừ thuế).
+* **3 Chốt chặn kiểm định (Checks) có mặt ở cả 2 bên**:
+  - **Check 1**: Kiểm tra file PDF hợp lệ và có số trang $> 0$.
+  - **Check 2**: Kiểm tra công thức thuế GTGT ($\text{Tổng} == \text{Gốc} + \text{VAT}$).
+  - **Check 3**: Kiểm tra tổng chi phí $\le 100.000.000\text{ VNĐ}$ và tiền không âm.
+* **Kết quả chốt sổ cái**: Tổng chi phí = **$60.200.000\text{ VNĐ}$**, VAT được khấu trừ = **$5.000.000\text{ VNĐ}$**.
 
 ---
 
-### 2. Chạy Dagster (Dev Server) & Kiểm Thử Tự Động
+## 🚀 Hướng Dẫn Chạy Thử Nghiệm
 
-#### A. Chạy Unit Test (Kiểm thử tức thì không cần bật server):
+### 1. Khởi động Dagster UI (Cổng 3000)
 ```bash
-cd /home/ducdm3/Self_training/AirFlow_Dagster
-PYTHONPATH=. pytest dagster_demo/tests/test_order_processing.py
-```
-*(Kết quả: 3/3 tests passed thành công, kiểm thử cả nhánh If-Else, Dynamic Loop và Asset Materialize).*
-
-#### B. Mở giao diện Dagster UI:
-```bash
-cd /home/ducdm3/Self_training/AirFlow_Dagster
 ./run_dagster_dev.sh
 ```
-* **Giao diện Web UI:** Mở trình duyệt tại `http://localhost:3000`
-* Xem đồ thị Ops Workflow hoặc xem Data Lineage Catalog trực quan trong `assets_workflow.py`.
+* **Web UI**: `http://localhost:3000`
+* Xem tab **Assets** để thấy Data Lineage 4 tầng.
+* Xem tab **Asset Checks** để thấy 3 chốt chặn kiểm định chất lượng.
+* Bấm **Materialize all** để chạy cập nhật.
 
 ---
 
-## 🧩 So Sánh Code Pattern Thực Tế
+### 2. Khởi động Apache Airflow UI (Cổng 8080)
+```bash
+./run_airflow_standalone.sh
+```
+* **Web UI**: `http://localhost:8080`
+* Bật DAG `invoice_multipage_pdf_airflow_dag` và bấm nút **Trigger DAG** (▶️).
+* Xem **Graph View** để thấy luồng rẽ nhánh File Check và Dynamic Task Mapping bóc tách 4 loại hóa đơn song song.
 
-| Khái niệm Step Functions | Triển khai trong Airflow (`airflow_demo`) | Triển khai trong Dagster (`dagster_demo`) |
-| :--- | :--- | :--- |
-| **Choice State (If-Else)** | `@task.branch` trả về task_id nhánh tiếp theo | `@op` với nhiều `Out()` và `yield Output(..., output_name=...)` |
-| **Map State (Loop)** | `process_single_order.expand(order=orders_list)` | `fan_out_orders` với `DynamicOut` + `.map(...)` |
-| **Gom kết quả (Fan-in)** | `@task(trigger_rule="none_failed_min_one_success")` nhận list | `aggregate_results(processed.collect())` |
-| **State Data Passing** | XCom tự động qua DB nội bộ | `IOManager` tự động quản lý luân chuyển dữ liệu |
+---
+
+### 3. Chạy Toàn Bộ Unit Test Tự Động
+```bash
+PYTHONPATH=. pytest dagster_demo/tests/ -v
+```
+*(Kết quả: 4/4 tests passed 100%).*

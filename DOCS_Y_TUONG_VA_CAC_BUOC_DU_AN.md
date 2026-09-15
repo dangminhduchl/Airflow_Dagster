@@ -1,177 +1,126 @@
-# 📖 TÀI LIỆU DỰ ÁN: Ý TƯỞNG, LUỒNG NGHIỆP VỤ & CƠ CHẾ AIRFLOW VS DAGSTER
+# 📖 TÀI LIỆU DỰ ÁN: XỬ LÝ FILE PDF ĐA HÓA ĐƠN (AIRFLOW VS. DAGSTER)
 
 ---
 
-## 🎯 1. Ý TƯỞNG & BÀI TOÁN KINH DOANH (BUSINESS CONTEXT)
+## 🎯 1. BÀI TOÁN KINH DOANH CHUNG (100% UNIFIED SCENARIO)
 
 ### 💡 Bối cảnh dự án
-Dự án này giải quyết bài toán cốt lõi: **Xử lý lô đơn hàng thương mại điện tử tự động (Order Processing Pipeline)**.
-Đây là bài toán kinh điển mô phỏng quy trình xử lý workflow phức tạp (trước đây thường chạy trên **AWS Step Functions** trên Cloud) và được đưa về vận hành **On-Premise / Kubernetes** thông qua 2 nền tảng mã nguồn mở hàng đầu: **Apache Airflow** và **Dagster**.
+Hàng tháng, phòng Kế toán & Tài chính tiếp nhận **1 tệp PDF tổng hợp chứa nhiều hóa đơn chứng từ đầu vào** (`chung_tu_dau_vao_thang_3.pdf`).
 
-### 🎯 Mục tiêu so sánh
-Đặt **cùng 1 tập dữ liệu và cùng 1 logic nghiệp vụ** lên cả Airflow và Dagster để so sánh trực quan:
-1. Cách viết code và tổ chức pipeline.
-2. Cách xử lý điều kiện rẽ nhánh (Choice / If-Else).
-3. Cách chạy vòng lặp song song nhiều phần tử (Dynamic Mapping / Map State).
-4. Cách gom kết quả báo cáo (Fan-in Aggregation).
-5. Cơ chế lưu trữ và luân chuyển dữ liệu giữa các bước.
-6. Cách hiển thị và kiểm thử (Dev Experience & Web UI).
+Thay vì bóc tách thủ công, hệ thống cần tự động:
+1. **Phân tách các trang PDF** và chạy **Vòng lặp song song 100%** qua từng trang.
+2. **AI nhận diện loại hóa đơn & Rẽ nhánh bóc tách chuyên biệt** ngay trong từng worker:
+   - **Trang 1 (VAT)**: Bóc tách MST 0101234567, Tiền gốc 50tr + VAT 5tr = **55.000.000 VNĐ** (Khấu trừ thuế: CÓ).
+   - **Trang 2 (Tiện ích EVN)**: Bóc tách Mã KH PE0100098765, Tiền điện = **1.850.000 VNĐ** (Khấu trừ thuế: CÓ).
+   - **Trang 3 (Công tác phí)**: Bóc tách Vé máy bay NV-889 Nguyễn Văn A = **3.200.000 VNĐ** (Khấu trừ thuế: CÓ).
+   - **Trang 4 (Biên lai bán lẻ)**: Bóc tách Mua trà cà phê tiếp khách = **150.000 VNĐ** (Khấu trừ thuế: KHÔNG - Cảnh báo).
+3. **Thực hiện 3 Chốt Chặn Kiểm Định (Checks)**:
+   - **Check 1 (File Integrity)**: Kiểm tra file PDF hợp lệ, có số trang $> 0$.
+   - **Check 2 (VAT Math)**: Kiểm tra công thức thuế GTGT ($\text{Tổng thanh toán} == \text{Tiền trước thuế} + \text{VAT}$).
+   - **Check 3 (Budget Limit Compliance - BLOCKING)**: Tổng chi phí $\le 100.000.000\text{ VNĐ}$ và không có số tiền âm.
+4. **Chốt Sổ Cái Chi Phí Tháng** và đẩy vào hệ thống ERP / SAP:
+   - **Tổng chi phí**: **$60.200.000\text{ VNĐ}$**
+   - **Thuế VAT được khấu trừ**: **$5.000.000\text{ VNĐ}$**
 
 ---
 
-## 🔄 2. CHI TIẾT LUỒNG NGHIỆP VỤ 4 BƯỚC (STEP-BY-STEP WORKFLOW)
-
-Toàn bộ quy trình xử lý đơn hàng trải qua **4 bước tuần tự và rẽ nhánh** như sau:
+## 🔄 2. SƠ ĐỒ LUỒNG THỰC THI (PARALLEL DYNAMIC ROUTING)
 
 ```mermaid
 graph TD
-    A["Bước 1: Fetch Orders Batch<br/>(Lấy danh sách đơn hàng & trạng thái hệ thống)"] --> B{"Bước 2: Condition / Choice<br/>(Hệ thống active & Có đơn?)"}
+    A["File PDF Đầu Vào (chung_tu_dau_vao_thang_3.pdf)"] --> B{"CHECK 1: File PDF có hợp lệ & > 0 trang?"}
     
-    B -- "False: Lô rỗng / Tắt hoạt động" --> C["Nhánh Skip:<br/>Ghi log cảnh báo & Kết thúc"]
-    B -- "True: Hợp lệ & Có dữ liệu" --> D["Bước 3: Dynamic Map<br/>(Duyệt song song từng đơn hàng)"]
+    B -- "File hỏng / 0 KB" --> C["Nhánh Cảnh Báo: Skip toàn bộ quy trình"]
+    B -- "File hợp lệ (4 trang)" --> D["VÒNG LẶP SONG SONG (.expand / .map)"]
     
-    D --> D1["Đơn ORD-001 ($1500)<br/>VIP -> Giảm 10% -> Còn $1350"]
-    D --> D2["Đơn ORD-002 ($250)<br/>Standard -> Không giảm -> $250"]
-    D --> D3["Đơn ORD-003 ($3200)<br/>VIP -> Giảm 10% -> Còn $2880"]
-    D --> D4["Đơn ORD-004 ($80)<br/>Standard -> Không giảm -> $80"]
+    subgraph ParallelLoop ["Xử lý song song 4 Worker độc lập"]
+        D --> P1["Worker 1 (Trang 1)<br/>AI nhận diện VAT -> Bóc tách MST, Tiền thuế 55tr"]
+        D --> P2["Worker 2 (Trang 2)<br/>AI nhận diện EVN -> Bóc tách Mã PE, Tiền điện 1.85tr"]
+        D --> P3["Worker 3 (Trang 3)<br/>AI nhận diện Vé bay -> Bóc tách Mã NV, Vé 3.2tr"]
+        D --> P4["Worker 4 (Trang 4)<br/>AI nhận diện Biên lai -> Cảnh báo loại trừ thuế 150k"]
+    end
     
-    D1 --> E["Bước 4: Fan-in Aggregation<br/>(Tổng hợp doanh thu & Báo cáo số đơn VIP)"]
-    D2 --> E
-    D3 --> E
-    D4 --> E
+    P1 & P2 & P3 & P4 --> G[("Gom 4 kết quả sau bóc tách song song")]
     
-    C --> F["Finish (Hoàn thành)"]
-    E --> F
+    G --> H{"CHECK 2 & 3: Kiểm định Thuế & Ngân sách"}
+    
+    H -- "PASS: Thuế khớp & Tổng chi phí 60.2tr <= 100tr" --> I[("CHỐT SỔ CÁI CHI PHÍ THÁNG (ERP / SAP)")]
+    H -- "FAIL: Sai thuế hoặc Vượt ngân sách 100tr" --> K["🚫 BLOCKED: Khóa Sổ Cái, Báo động Kế toán trưởng"]
 ```
 
-### Chi tiết logic từng bước:
-
-### 🔹 Bước 1: Thu thập dữ liệu lô (`Fetch Batch Data`)
-* **Hành động**: Lấy danh sách lô đơn hàng cần xử lý kèm cờ `is_active = True/False`.
-* **Dữ liệu mẫu**:
-  ```json
-  [
-    {"order_id": "ORD-001", "customer": "Alice", "amount": 1500, "item_count": 3},
-    {"order_id": "ORD-002", "customer": "Bob", "amount": 250, "item_count": 1},
-    {"order_id": "ORD-003", "customer": "Charlie", "amount": 3200, "item_count": 5},
-    {"order_id": "ORD-004", "customer": "David", "amount": 80, "item_count": 1}
-  ]
-  ```
-
-### 🔹 Bước 2: Rẽ nhánh điều kiện (`Choice State / If-Else`)
-* **Mục đích**: Kiểm tra lô đơn hàng có đủ điều kiện để xử lý hay không.
-* **Điều kiện**:
-  - **IF** `is_active == True` VÀ `len(orders) > 0` $\rightarrow$ Chuyển sang **Nhánh Xử Lý (Bước 3)**.
-  - **ELSE** $\rightarrow$ Chuyển sang **Nhánh Bỏ Qua (Skip Branch)**: Ghi log cảnh báo và kết thúc mà không chạy các bước nặng phía sau.
-
-### 🔹 Bước 3: Vòng lặp song song & Tính toán chiết khấu (`Dynamic Map State`)
-* **Mục đích**: Tách riêng từng đơn hàng để tính giá cuối cùng độc lập, không block lẫn nhau.
-* **Quy tắc phân loại (Business Rules)**:
-  - **Đơn VIP** (`amount >= 1000$`): Giảm giá 10% $\rightarrow$ `final_price = amount * 0.9`.
-  - **Đơn Tiêu Chuẩn** (`amount < 1000$`): Không giảm giá $\rightarrow$ `final_price = amount`.
-
-### 🔹 Bước 4: Gom kết quả & Báo cáo tổng thể (`Fan-in Aggregation`)
-* **Mục đích**: Thu thập toàn bộ kết quả đã xử lý từ Bước 3 để tạo báo cáo tài chính tổng quan cho cả lô.
-* **Kết quả đầu ra**:
-  - `total_orders`: 4 đơn.
-  - `vip_orders`: 2 đơn (Alice $1350, Charlie $2880).
-  - `total_revenue`: $4,560.
-  - `status`: `BATCH_SUCCESS`.
-
 ---
 
-## ⚙️ 3. APACHE AIRFLOW LÀM GÌ TRONG DỰ ÁN NÀY?
+## ⚖️ 3. SO SÁNH 2 GÓC NHÌN TRÊN CÙNG MỘT BÀI TOÁN
 
-* **File nguồn**: `airflow_demo/dags/order_processing_dag.py`
-* **Triết lý**: **Task-Driven** — Coi pipeline là một chuỗi các **Hành Động / Tasks** được thực thi theo thứ tự phụ thuộc (`A >> B`).
-
-### Cách Airflow giải quyết bài toán:
-1. **Định nghĩa DAG**: Sử dụng cú pháp mới `TaskFlow API` (`@dag` và `@task`).
-2. **Rẽ nhánh**: Dùng `@task.branch`. Hàm `check_batch_condition` phân tích dữ liệu và trả về chuỗi tên của task tiếp theo (`"prepare_orders_for_mapping"` hoặc `"handle_skipped_batch"`).
-3. **Chạy vòng lặp song song (Dynamic Task Mapping)**:
-   ```python
-   orders_list = prepare_orders_for_mapping(batch_data)
-   mapped_orders = process_single_order.expand(order=orders_list)
-   ```
-   *Airflow tự động sinh ra 4 task instance chạy song song lúc runtime.*
-4. **Gom kết quả (Aggregation)**:
-   Dùng `trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS` trên hàm `aggregate_results(mapped_orders)` để nhận list kết quả thông qua cơ chế `XCom`.
-5. **Giao diện Airflow Web UI (`http://localhost:8080`)**:
-   - Hiển thị đồ thị Graph View với trạng thái màu sắc (Success / Skipped / Failed).
-   - Cho phép xem chi tiết từng instance đơn hàng trong tab Mapped Instances.
-
----
-
-## 💎 4. DAGSTER LÀM GÌ TRONG DỰ ÁN NÀY?
-
-Dagster cung cấp 2 góc nhìn:
-
-### 🅰️ Cách 1: Mô hình Ops & Jobs (Tương thích 1-1 với Step Functions)
-* **File nguồn**: `dagster_demo/order_processing/ops_workflow.py`
-* **Cách thực hiện**:
-  - Dùng `@op` với `DynamicOut` và `DynamicOutput`:
-    ```python
-    dynamic_orders = fan_out_orders(process_branch)
-    processed = dynamic_orders.map(process_single_order)
-    aggregate_results(processed.collect())
-    ```
-  - Dữ liệu được luân chuyển trực tiếp thông qua kiểu dữ liệu strongly-typed.
-
----
-
-### 🅱️ Cách 2: Triết lý Hiện đại của Dagster — Software-Defined Assets (SDA)
-* **File nguồn**: `dagster_demo/order_processing/assets_workflow.py`
-* **Triết lý**: **Data-Driven** — Không tập trung vào "chạy task gì", mà tập trung vào **"Tài nguyên dữ liệu nào được sinh ra"**.
-
-1. **Asset 1 (`raw_orders_batch`)**: Bảng chứa dữ liệu thô lấy từ API/Database.
-2. **Asset 2 (`validated_orders`)**: Bảng dữ liệu đã được làm sạch, tính chiết khấu VIP.
-3. **Asset 3 (`batch_summary_report`)**: Bảng báo cáo tổng kết doanh thu.
-
-### Điểm vượt trội trên Dagster UI (`http://localhost:3000`):
-* **Data Lineage (Sơ đồ phả hệ dữ liệu)**: Nhìn thấy luồng dữ liệu biến đổi từ thô sang báo cáo cuối cùng.
-* **Gắn kèm Metadata trực tiếp**: Xem ngay trên giao diện tổng doanh thu, số bản ghi VIP, preview 2 dòng dữ liệu mà không cần vào database query.
-* **Kiểm thử tự động (Unit Test)**:
-  Có thể viết Unit Test kiểm thử từng hàm xử lý đơn hàng bằng `pytest` cực kỳ nhanh mà không cần bật bất kỳ Server hay Database nào:
-  ```bash
-  PYTHONPATH=. pytest dagster_demo/tests/test_order_processing.py
-  ```
-
----
-
-## 📊 5. BẢNG SO SÁNH TỔNG QUAN
-
-| Tiêu chí | AWS Step Functions (Gốc) | Apache Airflow (Triển khai) | Dagster (Triển khai) |
-| :--- | :--- | :--- | :--- |
-| **Loại hình kiến trúc** | Serverless Cloud Orchestrator | Task-Driven Orchestrator | Data-Driven Asset Orchestrator |
-| **Khai báo luồng** | JSON / Amazon States Language | Code Python thuần (`@dag`, `@task`) | Code Python thuần (`@asset` hoặc `@op`) |
-| **Rẽ nhánh (If-Else)** | Choice State | `@task.branch` trả về task_id | `@op` + `yield Output(...)` |
-| **Vòng lặp song song** | Map State | `.expand()` (Dynamic Task Mapping) | `DynamicOut()` + `.map()` |
-| **Gom kết quả** | End of Map State | `trigger_rule` + gom list XCom | `.collect()` gom Dynamic Outputs |
-| **Truyền dữ liệu** | JSON Payload qua state | `XCom` (lưu trong DB) | In/Out type-checked & `IOManager` |
-| **Unit Test cục bộ** | Rất khó (Cần Step Functions Local) | Phức tạp (Cần Airflow Context) | **Rất dễ dàng** với `pytest` |
-| **Data Lineage & Catalog**| Không có sẵn | Không chuyên sâu | **Tích hợp sẵn & trực quan** |
-
----
-
-## 🚀 6. HƯỚNG DẪN THAO TÁC THỰC HÀNH
-
-### 1. Khởi động Airflow UI (Cổng 8080)
-```bash
-./run_airflow_standalone.sh
+```text
+               ┌──────────────────────────────────────────────────────────┐
+               │         CÙNG 1 BÀI TOÁN: XỬ LÝ FILE PDF HÓA ĐƠN          │
+               │         (chung_tu_dau_vao_thang_3.pdf - 4 trang)         │
+               └────────────────────────────┬─────────────────────────────┘
+                                            │
+           ┌────────────────────────────────┴────────────────────────────────┐
+           ▼                                                                 ▼
+┌──────────────────────────────────────┐          ┌──────────────────────────────────────┐
+│  GÓC NHÌN 1: APACHE AIRFLOW          │          │  GÓC NHÌN 2: DAGSTER                 │
+│  (TASK-CENTRIC / PIPELINE AS TASKS)  │          │  (DATA-CENTRIC / PIPELINE AS ASSETS) │
+├──────────────────────────────────────┤          ├──────────────────────────────────────┤
+│ 📂 File:                              │          │ 📂 File:                              │
+│ airflow_demo/dags/                   │          │ dagster_demo/invoice_processing/     │
+│ invoice_multipage_pdf_dag.py         │          │ assets.py                            │
+│                                      │          │                                      │
+│ 🛠️ Triển khai:                       │          │ 🛠️ Triển khai:                       │
+│ 1. Ingest PDF                        │          │ 1. Asset: raw_multipage_invoice_pdf  │
+│ 2. Check 1: @task.branch             │          │ 2. Check 1: @asset_check             │
+│    (check_pdf_integrity)             │          │    (check_pdf_file_integrity)        │
+│ 3. Vòng lặp song song:               │          │ 3. Asset: extracted_invoice_pages    │
+│    process_and_route_single_page     │          │ 4. Asset: categorized_invoices       │
+│    .expand(page=pages)               │          │ 5. Check 2: @asset_check thuế VAT    │
+│ 4. Check 2 & 3: @task.branch         │          │ 6. Check 3: @asset_check(blocking)   │
+│    (audit_financial_budget)          │          │    (check_budget_limit_compliance)   │
+│ 5. Chốt sổ cái:                      │          │ 7. Asset: monthly_expense_ledger     │
+│    lock_and_publish_financial_ledger │                                                 │
+│                                      │ 🎯 Ưu điểm vượt trội:                   │
+│ 🎯 Ưu điểm vượt trội:                │ • Quản lý trọn vẹn vòng đời dữ liệu     │
+│ • Điều phối worker song song 100%    │ • Chốt chặn blocking tự động khóa luồng │
+│ • Mở rộng N trang không cần sửa code │ • Data Catalog xem trực tiếp metadata   │
+└──────────────────────────────────────┘          └──────────────────────────────────────┘
 ```
-* Mở trình duyệt: `http://localhost:8080` (Tài khoản/Mật khẩu hiển thị ở terminal khi khởi tạo).
-* Bật DAG `order_processing_airflow_dag` và bấm nút **Trigger DAG** (Nút Play ▶️) để xem luồng chạy.
 
-### 2. Khởi động Dagster UI (Cổng 3000)
+---
+
+## 📊 4. ĐỐI CHIẾU KẾT QUẢ ĐẦU RA (GIỐNG NHAU 100%)
+
+| Chỉ số tổng kết | Apache Airflow | Dagster |
+| :--- | :---: | :---: |
+| **Tổng số trang xử lý** | 4 trang | 4 trang |
+| **Tổng chi phí phê duyệt** | **60.200.000 VNĐ** | **60.200.000 VNĐ** |
+| **Tổng tiền thuế VAT được khấu trừ** | **5.000.000 VNĐ** | **5.000.000 VNĐ** |
+| **Số hóa đơn hợp lệ khấu trừ** | 3 hóa đơn | 3 hóa đơn |
+| **Số chứng từ bị cảnh báo loại trừ thuế** | 1 biên lai (150.000 VNĐ) | 1 biên lai (150.000 VNĐ) |
+| **Kết quả kiểm toán tài chính** | ✅ PASSED & LOCKED | ✅ AUDITED_AND_COMPLIANT |
+
+---
+
+## 🚀 5. HƯỚNG DẪN CHẠY VÀ KIỂM THỬ
+
+### 1. Chạy Dagster Web UI (Cổng 3000)
 ```bash
 ./run_dagster_dev.sh
 ```
 * Mở trình duyệt: `http://localhost:3000`
-* Xem tab **Assets** để thấy Data Lineage hoặc tab **Jobs** để xem Ops Workflow.
-* Bấm **Materialize all** để chạy cập nhật dữ liệu.
+* Xem tab **Assets** $\rightarrow$ Thấy nhóm `invoice_pipeline`.
+* Xem tab **Asset Checks** $\rightarrow$ Thấy 3 chốt chặn kiểm định: File Integrity, VAT Math, và Budget Limit.
 
-### 3. Chạy Unit Test kiểm tra logic
+### 2. Chạy Airflow Web UI (Cổng 8080)
 ```bash
-PYTHONPATH=. pytest dagster_demo/tests/test_order_processing.py
+./run_airflow_standalone.sh
 ```
-*(Kết quả kiểm thử 100% passed cho tất cả các nhánh If-Else, Dynamic Loop và Asset).*
+* Mở trình duyệt: `http://localhost:8080`
+* Bật DAG `invoice_multipage_pdf_airflow_dag` và bấm **Trigger DAG** (▶️).
+* Nhấp vào Task `process_and_route_single_page` để thấy **4 Mapped Instances** (`[0]`, `[1]`, `[2]`, `[3]`) chạy song song độc lập.
+
+### 3. Chạy Toàn Bộ Unit Tests
+```bash
+PYTHONPATH=. pytest dagster_demo/tests/ -v
+```
+*(Kết quả: 4/4 tests passed 100%).*
