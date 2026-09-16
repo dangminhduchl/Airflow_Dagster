@@ -6,6 +6,10 @@ from dagster import materialize
 from dagster_demo.invoice_processing.assets import (
     raw_multipage_invoice_pdf,
     extracted_invoice_pages,
+    vat_invoices,
+    utility_invoices,
+    reimbursement_invoices,
+    invalid_invoices,
     categorized_invoices,
     monthly_financial_expense_ledger,
     check_pdf_file_integrity,
@@ -15,17 +19,21 @@ from dagster_demo.invoice_processing.assets import (
 
 
 def test_invoice_pipeline_materialization():
-    """Kiểm thử chuỗi 4 Assets xử lý file PDF hóa đơn thành công 100%."""
+    """Kiểm thử chuỗi 8 Assets (bao gồm 4 nhánh chuyên biệt song song) thành công 100%."""
     result = materialize(
         [
             raw_multipage_invoice_pdf,
             extracted_invoice_pages,
+            vat_invoices,
+            utility_invoices,
+            reimbursement_invoices,
+            invalid_invoices,
             categorized_invoices,
             monthly_financial_expense_ledger,
         ]
     )
     assert result.success
-    assert len(result.get_asset_materialization_events()) == 4
+    assert len(result.get_asset_materialization_events()) == 8
 
 
 def test_check_pdf_file_integrity():

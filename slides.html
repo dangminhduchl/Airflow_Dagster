@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Slide Thuyết Trình: Chuyển Dịch Workflow Orchestration từ AWS Step Functions sang On-Premise (Airflow vs Dagster)</title>
+  <title>Slide Thuyết Trình: So Sánh Thực Chiến Airflow vs Dagster (Invoice PDF Processing)</title>
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,8 +12,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
-  <!-- Mermaid.js for diagrams -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     :root {
       --bg-main: #0a0e17;
@@ -51,141 +49,118 @@
       user-select: none;
     }
 
-    /* Ambient glow background */
     .ambient-glow {
       position: fixed;
       top: -20%;
       left: 10%;
       width: 60vw;
       height: 60vh;
-      background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(168, 85, 247, 0.08) 50%, transparent 70%);
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, rgba(59, 130, 246, 0.05) 50%, transparent 70%);
       filter: blur(80px);
-      z-index: 0;
       pointer-events: none;
+      z-index: 0;
     }
+
     .ambient-glow-2 {
       position: fixed;
       bottom: -20%;
-      right: 5%;
+      right: 10%;
       width: 50vw;
       height: 50vh;
-      background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 60%);
-      filter: blur(90px);
-      z-index: 0;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.12) 0%, rgba(244, 63, 94, 0.05) 50%, transparent 70%);
+      filter: blur(80px);
       pointer-events: none;
+      z-index: 0;
     }
 
-    /* Header Nav */
+    /* Presentation Header */
     header {
-      position: relative;
-      z-index: 10;
+      height: 56px;
+      border-bottom: 1px solid var(--border-card);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 28px;
-      border-bottom: 1px solid var(--border-card);
-      background: rgba(10, 14, 23, 0.7);
+      padding: 0 32px;
+      background: rgba(10, 14, 23, 0.8);
       backdrop-filter: blur(12px);
+      z-index: 10;
     }
-    .brand {
+
+    .header-logo {
       display: flex;
       align-items: center;
       gap: 12px;
       font-weight: 700;
       font-size: 15px;
       letter-spacing: 0.5px;
-    }
-    .brand-badge {
+      text-transform: uppercase;
       background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
-      color: #000;
-      font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 11px;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
-    .header-actions {
+
+    .header-badges {
       display: flex;
       align-items: center;
       gap: 12px;
     }
-    .slide-select {
-      background: rgba(30, 41, 59, 0.8);
-      color: var(--text-main);
+
+    .badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
       border: 1px solid var(--border-card);
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      outline: none;
-      cursor: pointer;
-      font-family: var(--font-sans);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
     }
-    .btn-action {
-      background: rgba(30, 41, 59, 0.8);
-      color: var(--text-main);
-      border: 1px solid var(--border-card);
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-    .btn-action:hover {
-      background: rgba(51, 65, 85, 0.9);
-      border-color: var(--accent-cyan);
+    .badge.active {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.4);
+      color: var(--accent-cyan);
     }
 
-    /* Main Slide Deck Container */
-    #deck {
-      position: relative;
+    /* Main Slide Container */
+    #slide-viewport {
       flex: 1;
+      position: relative;
       overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 5;
+      padding: 24px 48px;
+      z-index: 1;
     }
 
     .slide {
       position: absolute;
-      width: 90%;
-      max-width: 1250px;
-      height: 82vh;
+      width: calc(100% - 96px);
+      max-width: 1400px;
+      height: calc(100% - 48px);
       max-height: 820px;
       background: var(--bg-card);
       border: 1px solid var(--border-card);
       border-radius: 20px;
-      padding: 40px 50px;
-      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(20px);
+      padding: 40px 48px;
       display: flex;
       flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(6, 182, 212, 0.05);
+      backdrop-filter: blur(20px);
       opacity: 0;
-      transform: scale(0.96) translateY(20px);
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       pointer-events: none;
-      overflow-y: auto;
-    }
-
-    .slide::-webkit-scrollbar {
-      width: 6px;
-    }
-    .slide::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
+      transform: translateY(16px) scale(0.98);
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .slide.active {
       opacity: 1;
-      transform: scale(1) translateY(0);
       pointer-events: auto;
-      z-index: 2;
+      transform: translateY(0) scale(1);
     }
 
-    /* Slide Content Typography */
-    .slide-tag {
+    /* Slide Header Elements */
+    .slide-badge {
       font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
@@ -196,7 +171,7 @@
       align-items: center;
       gap: 8px;
     }
-    .slide-tag::before {
+    .slide-badge::before {
       content: '';
       display: inline-block;
       width: 8px;
@@ -205,10 +180,10 @@
       background: var(--accent-cyan);
     }
     .slide-title {
-      font-size: 32px;
+      font-size: 30px;
       font-weight: 800;
       line-height: 1.25;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 100%);
       -webkit-background-clip: text;
       background-clip: text;
@@ -219,28 +194,30 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      font-size: 16px;
+      gap: 16px;
+      font-size: 15.5px;
       line-height: 1.6;
       color: #e2e8f0;
+      overflow-y: auto;
+      padding-right: 8px;
     }
 
     /* Grid layouts */
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: 20px;
       flex: 1;
     }
     .grid-3 {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 20px;
+      gap: 16px;
     }
     .grid-4 {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
+      gap: 14px;
     }
 
     /* Cards */
@@ -248,21 +225,21 @@
       background: rgba(15, 23, 42, 0.65);
       border: 1px solid var(--border-card);
       border-radius: 14px;
-      padding: 22px;
+      padding: 18px 20px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       transition: border-color 0.2s ease;
     }
     .card:hover {
       border-color: rgba(6, 182, 212, 0.4);
     }
     .card-title {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
     .card-title.cyan { color: var(--accent-cyan); }
     .card-title.purple { color: var(--accent-purple); }
@@ -274,16 +251,16 @@
       padding-left: 20px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       color: #cbd5e1;
-      font-size: 14.5px;
+      font-size: 14px;
     }
 
     /* Tables */
     .styled-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 14px;
+      font-size: 13.5px;
       border-radius: 12px;
       overflow: hidden;
       background: rgba(15, 23, 42, 0.7);
@@ -293,199 +270,215 @@
       background: rgba(30, 41, 59, 0.9);
       color: var(--accent-cyan);
       text-align: left;
-      padding: 12px 18px;
+      padding: 10px 14px;
       font-weight: 600;
-      font-size: 13.5px;
+      font-size: 13px;
       border-bottom: 1px solid var(--border-card);
     }
     .styled-table td {
-      padding: 12px 18px;
+      padding: 10px 14px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      color: #e2e8f0;
-      vertical-align: middle;
+      color: #cbd5e1;
+    }
+    .styled-table tr:last-child td {
+      border-bottom: none;
     }
     .styled-table tr:hover td {
-      background: rgba(51, 65, 85, 0.25);
+      background: rgba(255, 255, 255, 0.02);
     }
 
-    /* Code Container & Tabs */
-    .code-tabs-wrapper {
-      display: flex;
-      flex-direction: column;
-      border: 1px solid var(--border-card);
+    /* Code Blocks */
+    .code-container {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
       overflow: hidden;
-      background: #1e1e2e;
-    }
-    .code-tabs-header {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      max-height: 480px;
       display: flex;
-      background: rgba(15, 23, 42, 0.9);
-      border-bottom: 1px solid var(--border-card);
-      padding: 6px 12px;
-      gap: 8px;
+      flex-direction: column;
     }
-    .code-tab-btn {
-      background: transparent;
-      border: none;
+    .code-header {
+      background: rgba(30, 41, 59, 0.6);
+      padding: 8px 16px;
+      font-size: 11px;
       color: var(--text-muted);
-      padding: 6px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-container pre {
+      margin: 0;
+      padding: 14px 18px;
+      overflow-x: auto;
+    }
+    .code-container code {
+      font-family: var(--font-mono);
+    }
+
+    /* ASCII / Flowchart boxes */
+    .flow-box {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px dashed rgba(6, 182, 212, 0.35);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: #93c5fd;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    /* Footer & Controls */
+    footer {
+      height: 64px;
+      border-top: 1px solid var(--border-card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      background: rgba(10, 14, 23, 0.8);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 10px;
       font-size: 13px;
       font-weight: 600;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .code-tab-btn.active {
-      background: var(--accent-cyan);
-      color: #0b0f19;
-    }
-    pre {
-      margin: 0 !important;
-      padding: 18px !important;
-      background: #1e1e2e !important;
-      overflow-x: auto;
-      font-family: var(--font-mono) !important;
-      font-size: 13px !important;
-      line-height: 1.55 !important;
-    }
-
-    /* Mermaid diagrams container */
-    .mermaid-box {
-      background: rgba(15, 23, 42, 0.5);
       border: 1px solid var(--border-card);
-      border-radius: 14px;
-      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      cursor: pointer;
       display: flex;
-      justify-content: center;
       align-items: center;
-      overflow-x: auto;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      border: none;
+      color: #ffffff;
+    }
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
     }
 
-    /* Speaker Notes Modal */
+    .progress-wrapper {
+      flex: 1;
+      max-width: 420px;
+      margin: 0 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .slide-select {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-card);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+    .slide-select:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    /* Notes Modal */
     #notes-modal {
       position: fixed;
-      bottom: 70px;
-      right: 30px;
-      width: 440px;
-      max-height: 480px;
+      bottom: 80px;
+      right: 32px;
+      width: 460px;
+      max-height: 400px;
       background: rgba(15, 23, 42, 0.95);
-      border: 1px solid var(--accent-cyan);
+      border: 1px solid rgba(6, 182, 212, 0.3);
       border-radius: 16px;
-      padding: 22px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
       backdrop-filter: blur(20px);
       z-index: 100;
       display: none;
       flex-direction: column;
       gap: 12px;
       color: #e2e8f0;
-      font-size: 14.5px;
+      font-size: 14px;
       line-height: 1.6;
-      animation: fadeIn 0.2s ease;
     }
     #notes-modal.show {
       display: flex;
     }
     .notes-header {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
       font-weight: 700;
       color: var(--accent-cyan);
-      border-bottom: 1px solid var(--border-card);
-      padding-bottom: 8px;
-    }
-    .notes-body {
-      overflow-y: auto;
-      max-height: 380px;
-      padding-right: 6px;
-    }
-
-    /* Footer Controls */
-    footer {
-      position: relative;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 28px;
-      border-top: 1px solid var(--border-card);
-      background: rgba(10, 14, 23, 0.7);
-      backdrop-filter: blur(12px);
-    }
-    .nav-controls {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .btn-nav {
-      background: rgba(30, 41, 59, 0.8);
-      color: var(--text-main);
-      border: 1px solid var(--border-card);
-      padding: 8px 18px;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-    .btn-nav:hover:not(:disabled) {
-      background: var(--accent-cyan);
-      color: #0b0f19;
-      border-color: var(--accent-cyan);
-    }
-    .btn-nav:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    .progress-wrapper {
-      flex: 1;
-      max-width: 450px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .progress-bar {
-      flex: 1;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
-      width: 5%;
-      transition: width 0.3s ease;
-    }
-    .slide-counter {
       font-size: 13px;
-      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .notes-close {
+      cursor: pointer;
       color: var(--text-muted);
-      font-family: var(--font-mono);
-      min-width: 55px;
-      text-align: right;
+      font-size: 18px;
+    }
+    .notes-content {
+      overflow-y: auto;
+      max-height: 320px;
+      color: #cbd5e1;
     }
 
-    /* Badges */
-    .badge {
+    /* Keyboard hint */
+    .key-hint {
       display: inline-block;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .badge-cyan { background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.4); }
-    .badge-purple { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid rgba(168, 85, 247, 0.4); }
-    .badge-green { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.4); }
-    .badge-amber { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.4); }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      padding: 2px 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
     }
   </style>
 </head>
@@ -495,925 +488,832 @@
 
   <!-- Header -->
   <header>
-    <div class="brand">
-      <span class="brand-badge">ORCHESTRATION</span>
-      <span>AWS Step Functions ➔ On-Premise (Airflow vs Dagster)</span>
+    <div class="header-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      Airflow vs. Dagster
     </div>
-    <div class="header-actions">
-      <select id="slideSelect" class="slide-select"></select>
-      <button class="btn-action" id="toggleNotesBtn" title="Xem lời thoại diễn giả (Phím N)">
-        🎙️ Speaker Notes [N]
-      </button>
-      <button class="btn-action" id="fullscreenBtn" title="Toàn màn hình (Phím F)">
-        ⛶ Fullscreen [F]
-      </button>
+    <div class="header-badges">
+      <span class="badge active">Invoice PDF Flagship Scenario</span>
+      <span class="badge">On-Premise / K8s</span>
     </div>
   </header>
 
-  <!-- Slide Deck -->
-  <main id="deck">
+  <!-- Slide Viewport -->
+  <main id="slide-viewport">
 
-    <!-- Slide 1 -->
-    <div class="slide active" data-title="1. Trang Tiêu Đề">
-      <div class="slide-tag">KHỞI ĐẦU HÀNH TRÌNH CHUYỂN DỊCH</div>
-      <h1 class="slide-title" style="font-size: 38px; margin-top: 10px;">
-        HÀNH TRÌNH ON-PREMISE ORCHESTRATION
-      </h1>
-      <p style="font-size: 20px; color: var(--accent-cyan); font-weight: 600; margin-bottom: 24px;">
-        Chuyển dịch từ AWS Step Functions sang Apache Airflow hay Dagster?
+    <!-- ==================== SLIDE 1 ==================== -->
+    <div class="slide active" data-title="Slide 1: Trang Tiêu Đề">
+      <div class="slide-badge">BÁO CÁO KIẾN TRÚC HỆ THỐNG</div>
+      <h1 class="slide-title" style="font-size: 38px; margin-top: 10px;">SO SÁNH THỰC CHIẾN AIRFLOW VS. DAGSTER</h1>
+      <p style="color: var(--accent-cyan); font-size: 20px; font-weight: 600; margin-bottom: 30px;">
+        Từ Cấu Tạo Cốt Lõi, Điểm Nghẽn Kỹ Thuật Đến Trải Nghiệm Xử Lý Dữ Liệu Hiện Đại
       </p>
-      <div class="slide-body">
-        <div class="grid-3" style="margin-top: 15px;">
-          <div class="card">
-            <div class="card-title cyan">🎯 Mục Tiêu Buổi Trình Bày</div>
-            <ul>
-              <li>Đánh giá nguyên nhân rời bỏ AWS Step Functions.</li>
-              <li>So sánh bản chất 2 triết lý: Task-Centric vs Data-Centric.</li>
-              <li>Phân tích code demo thực tế & giải pháp cho bài toán OCR.</li>
-              <li>Chốt đề xuất & Lộ trình chuyển đổi an toàn 3 giai đoạn.</li>
-            </ul>
-          </div>
-          <div class="card">
-            <div class="card-title purple">👥 Đối Tượng Lắng Nghe</div>
-            <ul>
-              <li>CTO & Engineering Managers</li>
-              <li>Tech Leads & System Architects</li>
-              <li>Data Engineers & Software Engineers</li>
-              <li>DevOps & SRE Infrastructure Team</li>
-            </ul>
-          </div>
-          <div class="card">
-            <div class="card-title green">⏱️ Thời Lượng Dự Kiến</div>
-            <ul>
-              <li><strong>Phần 1:</strong> Bối cảnh & Thách thức (8')</li>
-              <li><strong>Phần 2:</strong> Khái niệm cốt lõi (12')</li>
-              <li><strong>Phần 3:</strong> Code Walkthrough & Pytest Demo (15')</li>
-              <li><strong>Phần 4:</strong> Q&A & Action Items (10')</li>
-            </ul>
+
+      <div class="grid-2">
+        <div class="card" style="justify-content: center; gap: 16px;">
+          <div class="card-title cyan">📋 Kịch Bản Thuyết Trình 5 Phần</div>
+          <ul>
+            <li><strong>1. Đưa ra bài toán:</strong> Xử lý hóa đơn đa trang & kiểm toán chi phí</li>
+            <li><strong>2. Demo trực quan:</strong> Airflow Graph vs. Dagster Asset Graph</li>
+            <li><strong>3. Mổ xẻ Code & Cấu tạo:</strong> Cơ chế chạy ngầm và vòng đời Airflow</li>
+            <li><strong>4. Hạn chế cốt tử & Giải pháp:</strong> Dagster giải quyết từ gốc rễ</li>
+            <li><strong>5. Kết luận & Khuyến nghị:</strong> Định vị công nghệ & Lộ trình</li>
+          </ul>
+        </div>
+
+        <div class="card" style="justify-content: center; background: rgba(30, 41, 59, 0.4);">
+          <div class="card-title purple">🎯 Mục Tiêu Đạt Được</div>
+          <p style="font-size: 14.5px; color: #cbd5e1;">
+            Đánh giá khách quan dựa trên <strong>100% code thật</strong> cùng chạy một bài toán nghiệp vụ, chỉ ra chính xác bản chất vì sao công nghệ cũ gặp khó khăn và kiến trúc mới mang lại lợi thế cạnh tranh gì cho doanh nghiệp.
+          </p>
+          <div style="margin-top: 10px; font-size: 13px; color: var(--text-dim);">
+            Phím tắt: <span class="key-hint">←</span> <span class="key-hint">→</span> Chuyển slide | <span class="key-hint">N</span> Ghi chú diễn giả | <span class="key-hint">F</span> Toàn màn hình
           </div>
         </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Kính chào các anh chị em và ban lãnh đạo. Hôm nay, chúng ta cùng bàn về một chủ đề mang tính bước ngoặt trong kiến trúc dữ liệu và tự động hóa của doanh nghiệp: Làm thế nào để chuyển dịch các quy trình nghiệp vụ phức tạp đang chạy trên AWS Step Functions về vận hành hiệu quả, tối ưu chi phí trên hạ tầng On-Premise. Chúng ta sẽ đặt lên bàn cân hai ứng cử viên sáng giá nhất hiện nay: Apache Airflow - vị vua truyền thống của ngành điều phối dữ liệu, và Dagster - đại diện thế hệ mới với triết lý quản lý tài sản dữ liệu hiện đại.
+Kính chào anh chị và ban lãnh đạo. Khi đưa các quy trình xử lý dữ liệu và AI từ Cloud về hạ tầng On-Premise, câu hỏi lớn nhất luôn là: 'Chúng ta nên dùng công cụ nào để điều phối?'. Hôm nay, chúng ta không so sánh lý thuyết chung chung. Chúng ta sẽ lấy một bài toán nghiệp vụ thật 100%: Xử lý tập hóa đơn đa trang và kiểm toán chi phí tài chính, sau đó phân tích sâu từ cấu tạo ngầm, code thực tế, đến lý do vì sao kiến trúc cũ lại gặp điểm nghẽn và giải pháp thế hệ mới giải quyết ra sao.
       </div>
     </div>
 
-    <!-- Slide 2 -->
-    <div class="slide" data-title="2. Hiện Trạng AWS Step Functions">
-      <div class="slide-tag">BỐI CẢNH DỰ ÁN</div>
-      <h2 class="slide-title">Hiện Trạng: Vì Sao Từng Chọn AWS Step Functions?</h2>
+    <!-- ==================== SLIDE 2 ==================== -->
+    <div class="slide" data-title="Slide 2: Bài Toán Nghiệp Vụ Thực Tế">
+      <div class="slide-badge">PHẦN 1: ĐƯA RA BÀI TOÁN</div>
+      <h2 class="slide-title">Bài Toán Nghiệp Vụ: Xử Lý File Hóa Đơn PDF Đa Trang</h2>
       <div class="slide-body">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title cyan">⚡ Ưu Thế Từng Tận Dụng Rất Tốt</div>
-            <ul>
-              <li><strong>Zero Infrastructure:</strong> Không tốn nhân sự bảo trì máy chủ, hàng đợi (queue), scheduler hay metadata database.</li>
-              <li><strong>Tích hợp sâu hệ sinh thái AWS:</strong> Dễ dàng gọi trực tiếp Lambda, ECS Fargate, AWS Glue, DynamoDB, SNS/SQS.</li>
-              <li><strong>Trực quan hóa tuyệt vời:</strong> Visual Workflow Studio với sơ đồ State Machine trực tiếp theo dõi trạng thái từng bước.</li>
-              <li><strong>Cơ chế tự động:</strong> Tích hợp sẵn Retry with Exponential Backoff, Catch errors, Timeout theo cấu hình JSON ASL.</li>
-            </ul>
-          </div>
-          <div class="card">
-            <div class="card-title amber">⚠️ Những Hạn Chế Bắt Đầu Xuất Hiện</div>
-            <ul>
-              <li><strong>JSON Declarative gò bó:</strong> Viết logic phức tạp (Loop, Regex, Data transformation) trong JSON ASL rất khổ sở.</li>
-              <li><strong>Giới hạn Payload 256 KB:</strong> Dữ liệu trung gian giữa các bước bị giới hạn khắt khe, phải tự vòng qua S3.</li>
-              <li><strong>Vendor Lock-in:</strong> Chỉ chạy được trên AWS Cloud, không thể đem sang môi trường khác.</li>
-              <li><strong>Chi phí tăng phi mã:</strong> Mô hình tính phí theo lượt chuyển trạng thái (State Transition) trở nên đắt đỏ khi hệ thống chạy 24/7.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Trong giai đoạn đầu khởi tạo dự án trên đám mây, Step Functions là lựa chọn hoàn hảo. Chúng ta chỉ cần viết các file JSON trạng thái, ghép nối Lambda và ECS mà không cần bận tâm đến việc cài đặt server hay quản lý hàng đợi. Tuy nhiên, khi hệ thống bước sang giai đoạn phát triển ổn định với tần suất chạy liên tục và khối lượng dữ liệu khổng lồ, những điểm hạn chế bắt đầu bộc lộ.
-      </div>
-    </div>
+        <p>Hóa đơn quét đầu vào thường được gom thành 1 file scan đa trang tổng hợp: <code>chung_tu_dau_vao_thang_3.pdf</code> gồm 4 trang hỗn hợp tính chất:</p>
 
-    <!-- Slide 3 -->
-    <div class="slide" data-title="3. Động Lực Chuyển Dịch On-Premise">
-      <div class="slide-tag">BỐI CẢNH DỰ ÁN</div>
-      <h2 class="slide-title">4 Động Lực Chuyển Dịch Về On-Premise</h2>
-      <div class="slide-body">
         <div class="grid-4">
           <div class="card">
-            <div class="card-title green">💰 1. Tối Ưu Chi Phí</div>
-            <p style="font-size: 13.5px; color: #cbd5e1;">Step Functions tính phí theo State Transitions. Với pipeline chạy liên tục hoặc xử lý hàng chục nghìn đơn hàng/ảnh OCR mỗi ngày, chi phí Cloud leo thang đột biến.</p>
+            <div class="card-title cyan">Trang 1: Hóa đơn VAT</div>
+            <p style="font-size: 13.5px; color: #cbd5e1;">Dịch vụ Cloud Server (FPT Telecom)</p>
+            <div style="font-size: 12.5px; color: var(--accent-green); font-family: var(--font-mono); margin-top: auto;">
+              Subtotal: 15.000.000đ<br>VAT (10%): 1.500.000đ<br><strong>Tổng: 16.500.000đ</strong>
+            </div>
           </div>
           <div class="card">
-            <div class="card-title cyan">🛡️ 2. Chủ Quyền Dữ Liệu</div>
-            <p style="font-size: 13.5px; color: #cbd5e1;">Tuân thủ nghiêm ngặt các quy định bảo mật thông tin tài chính, hóa đơn, thông tin khách hàng nhạy cảm bắt buộc phải xử lý và lưu trữ trong Datacenter nội bộ.</p>
+            <div class="card-title amber">Trang 2: Tiền Điện EVN</div>
+            <p style="font-size: 13.5px; color: #cbd5e1;">Hóa đơn điện lực văn phòng</p>
+            <div style="font-size: 12.5px; color: var(--accent-green); font-family: var(--font-mono); margin-top: auto;">
+              Subtotal: 8.500.000đ<br>VAT (8%): 680.000đ<br><strong>Tổng: 9.180.000đ</strong>
+            </div>
           </div>
           <div class="card">
-            <div class="card-title purple">🏢 3. Tận Dụng Hạ Tầng</div>
-            <p style="font-size: 13.5px; color: #cbd5e1;">Doanh nghiệp đã đầu tư hạ tầng máy chủ vật lý, cụm Private Kubernetes và Storage nội bộ. Cần tối ưu hóa công suất phần cứng đã có sẵn.</p>
+            <div class="card-title purple">Trang 3: Công Tác Phí</div>
+            <p style="font-size: 13.5px; color: #cbd5e1;">Đề nghị thanh toán nhân viên</p>
+            <div style="font-size: 12.5px; color: var(--accent-green); font-family: var(--font-mono); margin-top: auto;">
+              Subtotal: 4.200.000đ<br>VAT (0%): 0đ<br><strong>Tổng: 4.200.000đ</strong>
+            </div>
           </div>
-          <div class="card">
-            <div class="card-title rose">🔓 4. Chống Lock-in</div>
-            <p style="font-size: 13.5px; color: #cbd5e1;">Chuẩn hóa toàn bộ logic nghiệp vụ về mã nguồn mở bằng ngôn ngữ Python tiêu chuẩn, dễ dàng bảo trì, mở rộng và chạy trên bất kỳ nền tảng nào.</p>
+          <div class="card" style="border-color: rgba(244, 63, 94, 0.4);">
+            <div class="card-title rose">Trang 4: Vé Hỏng / Rác</div>
+            <p style="font-size: 13.5px; color: #cbd5e1;">Biên lai mờ, thiếu MST & chữ ký</p>
+            <div style="font-size: 12.5px; color: var(--accent-rose); font-family: var(--font-mono); margin-top: auto;">
+              Trạng thái: <strong>Không hợp lệ</strong><br>Cần cách ly & kiểm toán
+            </div>
           </div>
         </div>
-        <div class="card" style="margin-top: 10px; background: rgba(30, 41, 59, 0.4);">
-          <p style="text-align: center; font-size: 16px; font-weight: 600; color: var(--accent-cyan);">
-            📌 Mục tiêu: Chuyển dịch về On-Premise nhưng phải giữ được tính trực quan, độ ổn định cao và nâng tầm trải nghiệm lập trình!
+
+        <div class="card" style="margin-top: 6px;">
+          <div class="card-title cyan">⚡ Yêu Cầu Kỹ Thuật Cốt Lõi</div>
+          <p style="font-size: 14px;">
+            1. Tự động tách 4 trang $\rightarrow$ 2. Nhận diện & rẽ nhánh xử lý song song $\rightarrow$ 3. Kiểm định tính toán thuế & đối soát ngân sách $\rightarrow$ 4. Ghi sổ cái chi phí doanh nghiệp.
           </p>
         </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Động lực chuyển dịch của chúng ta đến từ 4 trụ cột: Một là tối ưu chi phí vận hành định kỳ khi quy mô tăng cao; Hai là đáp ứng tuyệt đối các tiêu chuẩn bảo mật dữ liệu nhạy cảm; Ba là tận dụng cụm hạ tầng phần cứng nội bộ đã đầu tư; và Bốn là thoát khỏi sự ràng buộc độc quyền của Cloud Provider.
+Mỗi đầu tháng, phòng kế toán nhận hàng trăm file PDF scan. Điển hình như file chung_tu_dau_vao_thang_3.pdf này. File gồm 4 trang nhưng tính chất khác nhau hoàn toàn: có hóa đơn VAT chuẩn, có hóa đơn điện EVN, có thanh toán công tác phí không thuế, và có cả chứng từ rác không hợp lệ. Hệ thống bắt buộc phải tự động bóc tách, rẽ đúng nhánh xử lý, kiểm tra toán học và chặn đứng các sai phạm ngân sách.
       </div>
     </div>
 
-    <!-- Slide 4 -->
-    <div class="slide" data-title="4. Thách Thức Khi Rời Serverless">
-      <div class="slide-tag">BỐI CẢNH DỰ ÁN</div>
-      <h2 class="slide-title">Thách Thức Lớn Khi Rời Bỏ Serverless</h2>
-      <div class="slide-body">
-        <table class="styled-table">
-          <thead>
-            <tr>
-              <th>Hạng Mục</th>
-              <th>AWS Step Functions (Trước đây)</th>
-              <th>On-Premise Tự Quản Trị (Thách thức mới)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Quản Trị Hạ Tầng</strong></td>
-              <td>AWS lo 100% (Serverless)</td>
-              <td>Phải tự triển khai & vận hành Scheduler, Queue, Database, Worker, Web UI.</td>
-            </tr>
-            <tr>
-              <td><strong>Lưu Trữ Dữ Liệu & State</strong></td>
-              <td>AWS State Engine tự duy trì</td>
-              <td>Cần hệ thống Object Storage nội bộ (MinIO Cluster) & PostgreSQL HA.</td>
-            </tr>
-            <tr>
-              <td><strong>Ngôn Ngữ & Mô Hình</strong></td>
-              <td>JSON tĩnh (ASL)</td>
-              <td>Chuyển dịch sang Code-as-Configuration hoàn toàn bằng <strong>Python</strong>.</td>
-            </tr>
-            <tr>
-              <td><strong>Độ Sẵn Sàng (HA)</strong></td>
-              <td>AWS Multi-AZ tự động</td>
-              <td>Tự thiết kế giải pháp K8s Autoscaling, Failover và Disaster Recovery.</td>
-            </tr>
-            <tr>
-              <td><strong>Kiểm Thử Cục Bộ (Local Dev)</strong></td>
-              <td>❌ Cực kỳ khó khăn, chậm chạp</td>
-              <td>🎯 <strong>Nỗi đau lớn nhất cần giải quyết: Phải test & debug mượt mà trên máy dev!</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Rời bỏ Step Functions mang lại sự tự do và tiết kiệm, nhưng đặt lên vai chúng ta thách thức về năng lực tự vận hành. Đặc biệt, chúng ta phải giải quyết triệt để nỗi đau lớn nhất của Step Functions trước đây: việc lập trình và kiểm thử cục bộ cực kỳ khó khăn. Vì vậy, công cụ mới được chọn phải có trải nghiệm lập trình vượt trội.
-      </div>
-    </div>
-
-    <!-- Slide 5 -->
-    <div class="slide" data-title="5. Đặt Vấn Đề: Airflow vs Dagster">
-      <div class="slide-tag">LỰA CHỌN CÔNG CỤ</div>
-      <h2 class="slide-title">Đặt Vấn Đề: Apache Airflow hay Dagster?</h2>
+    <!-- ==================== SLIDE 3 ==================== -->
+    <div class="slide" data-title="Slide 3: Sơ Đồ Quy Trình & 3 Tầng Kiểm Định">
+      <div class="slide-badge">PHẦN 1: ĐƯA RA BÀI TOÁN</div>
+      <h2 class="slide-title">Sơ Đồ Dòng Chảy Nghiệp Vụ & 3 Chốt Chặn Kiểm Định</h2>
       <div class="slide-body">
         <div class="grid-2">
-          <div class="card" style="border-left: 4px solid var(--accent-blue);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span class="card-title" style="color: var(--accent-blue);">APACHE AIRFLOW</span>
-              <span class="badge badge-cyan">Vị Vua Tiền Nhiệm</span>
-            </div>
-            <ul>
-              <li><strong>Năm ra đời:</strong> 2014 (Airbnb) - Apache Top-Level Project.</li>
-              <li><strong>Triết lý:</strong> <strong>Task-Centric</strong> ("Làm việc gì và theo thứ tự nào?").</li>
-              <li><strong>Hệ sinh thái:</strong> Khổng lồ, hàng trăm Providers kết nối với mọi hệ thống từ cổ điển đến hiện đại.</li>
-              <li><strong>Nhân lực:</strong> Rất đông đảo kỹ sư đã thành thạo trên thị trường.</li>
-            </ul>
+          <div class="flow-box">
+┌────────────────────────────────────────────────────────┐
+│      1. File PDF Hóa Đơn 4 Trang Đầu Vào                │
+└───────────────────────────┬────────────────────────────┘
+                            │ 🛡️ CHECK 1: File Integrity (Hợp lệ, >0 trang)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│      2. Bóc Tách Trang & Rẽ Nhánh (Page Splitter)       │
+└───────┬──────────────┬──────────────┬──────────────┬───┘
+        ▼              ▼              ▼              ▼
+   [Nhánh VAT]    [Nhánh EVN]    [Công Tác]     [Vé Hỏng]
+   (Trang 1)      (Trang 2)      (Trang 3)      (Trang 4)
+        │              │              │              │
+        └──────────────┼──────────────┴──────────────┘
+                       ▼
+┌────────────────────────────────────────────────────────┐
+│      3. Gộp Bảng Kê Tổng Hợp Chi Phí Tháng             │
+│         🛡️ CHECK 2: VAT Tax Math (Total == Sub + VAT) │
+│         🛡️ CHECK 3: Budget Limit (&lt;= 100.000.000 VNĐ)   │
+└───────────────────────────┬────────────────────────────┘
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│      4. Ghi Sổ Cái Kế Toán (Expense Ledger Database)    │
+└────────────────────────────────────────────────────────┘
           </div>
-          <div class="card" style="border-left: 4px solid var(--accent-purple);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span class="card-title" style="color: var(--accent-purple);">DAGSTER</span>
-              <span class="badge badge-purple">Thế Hệ Kế Cận</span>
-            </div>
-            <ul>
-              <li><strong>Năm ra đời:</strong> 2018 (sáng lập bởi cựu tác giả GraphQL tại Facebook).</li>
-              <li><strong>Triết lý:</strong> <strong>Data/Asset-Centric</strong> ("Dữ liệu nào cần sinh ra?").</li>
-              <li><strong>Kiến trúc:</strong> Thiết kế chuẩn Software Engineering, phân tách gRPC Code Location.</li>
-              <li><strong>Vũ khí bí mật:</strong> Khả năng Unit Test tức thì với Pytest & Data Lineage tự động.</li>
-            </ul>
-          </div>
-        </div>
-        <p style="text-align: center; color: #94a3b8; font-style: italic; margin-top: 10px;">
-          Hãy cùng đi sâu vào so sánh khái niệm cốt lõi và kiểm chứng bằng code thực tế giữa hai công cụ!
-        </p>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Đứng trước bài toán này, chúng ta có hai hướng đi tiêu biểu: Chọn Airflow - con đường quen thuộc, an toàn về mặt tuyển dụng và thị trường; hoặc chọn Dagster - một kiến trúc hiện đại hơn, giải quyết triệt để các vấn đề cốt lõi về chất lượng dữ liệu và kiểm thử phần mềm. Hãy cùng đi sâu vào so sánh khái niệm của hai công cụ này.
-      </div>
-    </div>
 
-    <!-- Slide 6 -->
-    <div class="slide" data-title="6. Khái Niệm Cốt Lõi: Hai Triết Lý">
-      <div class="slide-tag">KHÁI NIỆM CỐT LÕI</div>
-      <h2 class="slide-title">Hai Triết Lý Thiết Kế Đối Lập</h2>
-      <div class="slide-body">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title cyan">⚡ Apache Airflow: Task-Centric</div>
-            <p style="font-size: 14px; color: #cbd5e1;">
-              Tập trung vào <strong>luồng thực thi tác vụ (Execution Flow)</strong>:
-            </p>
-            <div style="background: rgba(0,0,0,0.4); padding: 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px; color: var(--accent-cyan);">
-              [Task 1: Fetch API]<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;│<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;▼<br>
-              [Task 2: Clean Orders]<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;│<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;▼<br>
-              [Task 3: Compute Revenue]
+          <div class="card" style="justify-content: space-between;">
+            <div>
+              <div class="card-title amber">🛡️ 3 Chốt Chặn Bắt Buộc Của Kiểm Toán</div>
+              <ul style="margin-top: 12px; gap: 10px;">
+                <li><strong>Check 1 (File Integrity):</strong> Chặn ngay nếu file PDF bị corrupt hoặc rỗng 0 trang.</li>
+                <li><strong>Check 2 (VAT Math):</strong> Kiểm tra tính toàn vẹn toán học từng trang: <code>Total = Subtotal + VAT</code>.</li>
+                <li><strong>Check 3 (Budget Limit):</strong> Tổng chi phí tháng không được vượt hạn mức phê duyệt <code>100.000.000 VNĐ</code>. Nếu vi phạm, <strong>ngắt luồng ngay lập tức</strong>, không cho ghi vào sổ cái!</li>
+              </ul>
             </div>
-            <ul>
-              <li>Airflow chỉ quan tâm Task 1 xong thì trigger Task 2.</li>
-              <li>Dữ liệu sinh ra bên trong task chỉ là <em>"tác dụng phụ" (side-effect)</em> không được theo dõi tự động.</li>
-            </ul>
-          </div>
-          <div class="card">
-            <div class="card-title purple">📦 Dagster: Data/Asset-Centric</div>
-            <p style="font-size: 14px; color: #cbd5e1;">
-              Tập trung vào <strong>Tài sản Dữ liệu (Software-Defined Assets)</strong>:
-            </p>
-            <div style="background: rgba(0,0,0,0.4); padding: 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px; color: var(--accent-purple);">
-              (Asset: raw_orders)<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;│<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;▼<br>
-              (Asset: validated_orders)<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;│<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;▼<br>
-              (Asset: batch_summary_report)
+            <div style="padding: 12px; border-radius: 8px; background: rgba(6, 182, 212, 0.1); font-size: 13.5px; border-left: 3px solid var(--accent-cyan);">
+              💡 <strong>Thử thách:</strong> Cả Airflow và Dagster phải giải quyết chính xác 100% logic này, nhưng cách tổ chức và trải nghiệm vận hành sẽ hoàn toàn khác biệt!
             </div>
-            <ul>
-              <li>Khai báo bảng dữ liệu nào cần sinh ra và phụ thuộc vào đâu.</li>
-              <li>Tự động nhận diện Data Lineage, theo dõi Data Freshness, và hỗ trợ Re-materialize từng asset.</li>
-            </ul>
           </div>
         </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Đây là slide quan trọng nhất về mặt tư duy. Airflow sinh ra trong thời kỳ quản lý tác vụ: nó chỉ quan tâm Task A chạy xong thì kích hoạt Task B. Nó không biết bên trong Task A có sinh ra file gì hay không. Ngược lại, Dagster định nghĩa hệ thống dựa trên Tài sản dữ liệu (Software-Defined Assets). Chúng ta khai báo bảng dữ liệu nào cần được sinh ra, và Dagster sẽ tự động tính toán đồ thị phụ thuộc để chạy các bước tương ứng.
+Đây là luồng nghiệp vụ 100% giống nhau mà chúng ta sẽ yêu cầu cả Airflow và Dagster cùng giải quyết. Nhìn sơ đồ rất đơn giản, nhưng để thể hiện được 4 nhánh rẽ song song trên giao diện, và đặc biệt là cơ chế 'chặn đứng khi vi phạm ngân sách', hai hệ thống sẽ giải quyết theo hai trường phái kiến trúc đối lập nhau hoàn toàn.
       </div>
     </div>
 
-    <!-- Slide 7 -->
-    <div class="slide" data-title="7. Ánh Xạ Mental Model">
-      <div class="slide-tag">KHÁI NIỆM CỐT LÕI</div>
-      <h2 class="slide-title">Ánh Xạ Khái Niệm: Step Functions ➔ Airflow ➔ Dagster</h2>
-      <div class="slide-body">
-        <table class="styled-table">
-          <thead>
-            <tr>
-              <th>AWS Step Functions</th>
-              <th>Apache Airflow</th>
-              <th>Dagster (Ops & Assets)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>State Machine Definition</strong></td>
-              <td><code>@dag</code> / DAG object file</td>
-              <td><code>@job</code> (Ops) hoặc <code>Definitions</code> (Asset Graph)</td>
-            </tr>
-            <tr>
-              <td><strong>Task State</strong> (Lambda, ECS)</td>
-              <td><code>@task</code> (TaskFlow API) / Operator</td>
-              <td><code>@op</code> (Compute) hoặc <code>@asset</code> (Data Asset)</td>
-            </tr>
-            <tr>
-              <td><strong>Choice State</strong> (If-Else)</td>
-              <td><code>@task.branch</code></td>
-              <td>Multi-output: <code>yield Output(output_name=...)</code></td>
-            </tr>
-            <tr>
-              <td><strong>Map State</strong> (Parallel Loop)</td>
-              <td>Dynamic Task Mapping (<code>.expand()</code>)</td>
-              <td>Dynamic Outputs (<code>DynamicOut</code>) / Partitioned Asset</td>
-            </tr>
-            <tr>
-              <td><strong>Payload Input / Output</strong></td>
-              <td>Airflow XCom (Metadata DB)</td>
-              <td><code>IOManager</code> (Tự động hóa qua MinIO / Disk / S3)</td>
-            </tr>
-            <tr>
-              <td><strong>State History & Logs</strong></td>
-              <td>Grid View & Worker Logs</td>
-              <td>Run Timeline, Step Events, Asset Catalog & Lineage</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Khi chuyển đổi từ Step Functions, các kỹ sư không cần phải học lại từ đầu vì mọi khái niệm trong Step Functions đều có ánh xạ tương đương trong cả Airflow và Dagster. Điểm khác biệt mấu chốt nằm ở cách xử lý dữ liệu truyền giữa các bước, như chúng ta sẽ thấy ở slide tiếp theo.
-      </div>
-    </div>
-
-    <!-- Slide 8 -->
-    <div class="slide" data-title="8. Luân Chuyển Data: XCom vs IOManager">
-      <div class="slide-tag">KHÁI NIỆM CỐT LÕI</div>
-      <h2 class="slide-title">Luân Chuyển Dữ Liệu: XCom vs. IOManager</h2>
+    <!-- ==================== SLIDE 4 ==================== -->
+    <div class="slide" data-title="Slide 4: Demo Airflow">
+      <div class="slide-badge">PHẦN 2: LIVE DEMO HỆ THỐNG</div>
+      <h2 class="slide-title">Demo Airflow: Graph View & TaskFlow Dynamic Mapping</h2>
       <div class="slide-body">
         <div class="grid-2">
           <div class="card">
-            <div class="card-title amber">⚠️ Airflow XCom: Rào Cản Lớn</div>
+            <div class="card-title cyan">Trải Nghiệm Trên Giao Diện Airflow (Port 8080)</div>
             <ul>
-              <li><strong>Lưu trực tiếp vào Metadata Database (Postgres):</strong> Giới hạn dung lượng nghiêm ngặt (vài chục KB - 1MB).</li>
-              <li><strong>Dễ làm nghẽn DB:</strong> Nếu vô tình trả về DataFrame, mảng ảnh lớn hoặc JSON cồng kềnh, Postgres của Airflow sẽ phình to và sập.</li>
-              <li><strong>Gánh nặng cho Developer:</strong> Phải tự viết thêm logic upload file lên MinIO/S3, rồi truyền URL string qua XCom để task sau tự tải về.</li>
+              <li><strong>Mô hình:</strong> Task-Centric Graph View (Đồ thị các ô vuông công việc).</li>
+              <li><strong>Rẽ nhánh 4 hướng:</strong> <code>extract_vat_invoice</code>, <code>extract_utility_invoice</code>, <code>extract_reimbursement_invoice</code>, <code>extract_invalid_invoice</code>.</li>
+              <li><strong>Song song:</strong> Dùng <code>.expand()</code> để tạo các Dynamic Task Instances.</li>
+              <li><strong>Gộp nhánh:</strong> Bắt buộc dùng <code>TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS</code> vì nhánh rác bị skip.</li>
             </ul>
           </div>
-          <div class="card">
-            <div class="card-title green">🚀 Dagster IOManager: Sự Giải Thoát</div>
-            <ul>
-              <li><strong>Tách biệt Business Logic và Storage:</strong> Developer chỉ cần viết hàm Python trả về <code>return orders_list</code> hoặc <code>return image_bytes</code>.</li>
-              <li><strong>Tự động hóa hoàn toàn:</strong> IOManager tự serialize (pickle, parquet, json) lưu vào MinIO/S3 hoặc Local Disk. Task sau chỉ việc khai báo đối số là nhận được ngay dữ liệu.</li>
-              <li><strong>Linh hoạt tuyệt đối:</strong> Chuyển từ Local Disk (khi dev) sang MinIO HA (khi lên K8s Production) chỉ bằng 1 dòng cấu hình mà không sửa 1 dòng code nghiệp vụ!</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Dưới nắp ca-pô, tại sao Airflow lại thiết kế XCom như vậy? Năm 2014, Airflow sinh ra để điều phối các job Spark/Hadoop khổng lồ. Dữ liệu cần truyền giữa các task chỉ là vài chục bytes chuỗi đường dẫn HDFS hoặc Job ID, do đó Airflow thực hiện câu lệnh SQL INSERT thẳng vào bảng xcom trong PostgreSQL. Nhưng ngày nay, khi kỹ sư xử lý Pandas DataFrame, mảng JSON lớn hay ảnh OCR, việc nhồi hàng trăm MB vào Postgres sẽ làm sập Scheduler! Ngược lại, Dagster sinh ra năm 2018 với triết lý IOManager: Tách rời hoàn toàn Logic tính toán và Hạ tầng lưu trữ. Hàm của bạn là Python thuần, còn IOManager tự lo việc ghi Parquet/Pickle ra MinIO và nạp lại ở bước sau. Cơ sở dữ liệu Postgres của Dagster không bao giờ bị phình to.
-      </div>
-    </div>
 
-    <!-- Slide 9 -->
-    <div class="slide" data-title="9. Kiến Trúc On-Premise & Cách Ly">
-      <div class="slide-tag">KIẾN TRÚC HẠ TẦNG</div>
-      <h2 class="slide-title">Kiến Trúc Vận Hành On-Premise & Sự Cách Ly</h2>
-      <div class="slide-body">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title cyan">Airflow Cluster</div>
-            <ul style="font-size: 14px;">
-              <li><strong>Thành phần:</strong> Webserver + Scheduler + Celery Workers + Redis Broker + PostgreSQL.</li>
-              <li><strong>Điểm yếu cách ly:</strong> Code của developer thường chạy chung môi trường Python trong Celery Worker. Xung đột phiên bản thư viện (dependency conflict) giữa các nhóm là bài toán đau đầu.</li>
-            </ul>
-          </div>
-          <div class="card">
-            <div class="card-title purple">Dagster gRPC Code Locations</div>
-            <ul style="font-size: 14px;">
-              <li><strong>Thành phần:</strong> Webserver + Dagster Daemon + PostgreSQL + <em>Code Location Containers</em>.</li>
-              <li><strong>Phân tách triệt để:</strong> Lõi điều phối và code của các team hoàn toàn độc lập qua gRPC. Nếu pipeline của Team A bị lỗi cú pháp hoặc crash bộ nhớ, hệ thống chung vẫn chạy 100% bình thường.</li>
-            </ul>
+          <div class="card" style="background: rgba(30, 41, 59, 0.4);">
+            <div class="card-title amber">Cảm Nhận Thực Tế Của Người Điều Hành</div>
+            <div style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+              ⚠️ <strong>Airflow chỉ báo trạng thái thực thi</strong>: Ô màu xanh nghĩa là Python chạy không bị crash.<br><br>
+              ❌ <strong>Không thấy dữ liệu:</strong> Trên màn hình không có thông tin tổng tiền bao nhiêu, có bao nhiêu hóa đơn hợp lệ. Muốn biết, người dùng phải click vào từng Task $\rightarrow$ chọn tab <strong>XCom</strong> $\rightarrow$ đọc chuỗi JSON text.
+            </div>
           </div>
         </div>
-        <div class="card" style="background: rgba(15, 23, 42, 0.4);">
-          <div style="font-size: 14.5px; font-weight: 600; color: var(--accent-cyan); margin-bottom: 6px;">
-            🏗️ Hạ tầng On-Premise mục tiêu đề xuất:
-          </div>
-          <p style="font-size: 13.5px; color: #cbd5e1;">
-            Kubernetes Cluster nội bộ (Microk8s / RKE2) + MinIO Cluster (Object Storage chuẩn S3) + PostgreSQL HA Cluster (State Storage).
+
+        <div class="card">
+          <div class="card-title purple">Cơ Chế Chặn Vi Phạm Ngân Sách Bên Airflow</div>
+          <p style="font-size: 13.5px;">
+            Dùng hàm <code>@task.branch</code>: Nếu chi phí > 100M VND $\rightarrow$ trả về string <code>"flag_budget_violation"</code>, làm cho task <code>"commit_to_database"</code> bị bỏ qua (Skipped). Đòi hỏi phải tạo thêm nhiều task rác trong DAG.
           </p>
         </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Về mặt vận hành On-premise, điểm khác biệt lớn nhất bên dưới nắp ca-pô là cơ chế nạp code: Airflow dùng vòng lặp liên tục quét thư mục dags mỗi 30 giây, khiến Scheduler luôn tốn nhiều CPU và rất nguy hiểm nếu ai lỡ viết kết nối DB ở ngoài hàm. Trong khi đó, Dagster dùng kiến trúc Microservices phân tách: Lõi điều phối (Daemon) và code của kỹ sư giao tiếp qua gRPC. Mỗi team sở hữu một Code Location container riêng, dùng phiên bản Python và thư viện độc lập mà không sợ xung đột.
+Xin mời các anh chị quan sát màn hình Airflow tại cổng 8080. Trên Graph View, Airflow vẽ đồ thị các ô vuông biểu thị cho các 'Task' (Hành động). Khi kích hoạt DAG, ta thấy nhánh rẽ xuất hiện. Các trang được đẩy vào từng hộp xử lý. Tuy nhiên, hãy để ý: Airflow chỉ báo trạng thái Xanh lá cây (Success) hoặc Đỏ (Failed). Bản thân giao diện Airflow không cho ta biết bên trong mỗi hộp đó dữ liệu gồm những hóa đơn nào, trị giá bao nhiêu tiền, trừ khi ta phải bấm vào từng task rồi mò vào tab XCom hoặc đọc hàng trăm dòng log chữ đen.
       </div>
     </div>
 
-    <!-- Slide 10 -->
-    <div class="slide" data-title="10. Trải Nghiệm Lập Trình & Testing">
-      <div class="slide-tag">DEVELOPER EXPERIENCE</div>
-      <h2 class="slide-title">Developer Experience & Năng Lực Kiểm Thử (DevX)</h2>
-      <div class="slide-body">
-        <table class="styled-table">
-          <thead>
-            <tr>
-              <th>Tiêu Chí Đánh Giá</th>
-              <th>Apache Airflow</th>
-              <th>Dagster (Vượt Trội)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Môi Trường Chạy Thử Local</strong></td>
-              <td>Cồng kềnh; phải dựng cụm Docker Compose (DB + Webserver + Scheduler) tốn RAM.</td>
-              <td><strong>Cực nhẹ;</strong> chỉ cần 1 lệnh <code>dagster dev</code> là có giao diện hoàn chỉnh.</td>
-            </tr>
-            <tr>
-              <td><strong>Viết Unit Test Với Pytest</strong></td>
-              <td>Khó khăn; phải mock Airflow Context, TaskInstance, Jinja templating.</td>
-              <td><strong>Tự nhiên 100%;</strong> các op và asset là hàm Python thuần, test trực tiếp trong 1s.</td>
-            </tr>
-            <tr>
-              <td><strong>Test Toàn Bộ Pipeline Trong RAM</strong></td>
-              <td>Hầu như không hỗ trợ offline hoàn chỉnh.</td>
-              <td>Hỗ trợ native <code>job.execute_in_process()</code> & <code>materialize()</code> chạy in-memory.</td>
-            </tr>
-            <tr>
-              <td><strong>Tốc Độ Feedback Loop</strong></td>
-              <td>Vài phút mỗi lần sửa code để chờ trigger.</td>
-              <td><strong>Vài giây</strong> ngay trên IDE của kỹ sư!</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Đây là yếu tố quyết định năng suất của kỹ sư. Với Dagster, chúng ta có thể áp dụng toàn bộ chuẩn mực phát triển phần mềm hiện đại: viết unit test với pytest, chạy CI/CD tự động trước khi merge code. Với Airflow, việc kiểm thử cục bộ luôn là một trải nghiệm cồng kềnh.
-      </div>
-    </div>
-
-    <!-- Slide 11 -->
-    <div class="slide" data-title="11. Kịch Bản Nghiệp Vụ Demo">
-      <div class="slide-tag">DEMO & CODE WALKTHROUGH</div>
-      <h2 class="slide-title">Kịch Bản Demo: Order Processing Workflow</h2>
+    <!-- ==================== SLIDE 5 ==================== -->
+    <div class="slide" data-title="Slide 5: Demo Dagster">
+      <div class="slide-badge">PHẦN 2: LIVE DEMO HỆ THỐNG</div>
+      <h2 class="slide-title">Demo Dagster: Asset Graph & Chặn Vi Phạm Với Asset Checks</h2>
       <div class="slide-body">
         <div class="grid-2">
           <div class="card">
-            <div class="card-title cyan">4 Bước Nghiệp Vụ Kinh Điển</div>
-            <ul style="font-size: 14.5px;">
-              <li><strong>1. Task State (Fetch Data):</strong> Lấy lô đơn hàng cần xử lý.</li>
-              <li><strong>2. Choice State (Branching):</strong> Kiểm tra lô hàng hợp lệ hay rỗng/bảo trì để rẽ nhánh.</li>
-              <li><strong>3. Dynamic Map State (Loop Song Song):</strong> Lặp qua từng đơn hàng độc lập để tính chiết khấu VIP (>= 1000$).</li>
-              <li><strong>4. Fan-In Aggregation:</strong> Tổng hợp báo cáo tài chính của cả lô đơn hàng.</li>
+            <div class="card-title green">Trải Nghiệm Trên Giao Diện Dagster (Port 3000)</div>
+            <ul>
+              <li><strong>Mô hình:</strong> Asset-Centric Lineage (Phả hệ tài sản dữ liệu).</li>
+              <li><strong>Hiển thị trực quan:</strong> Nhìn thấy các thực thể dữ liệu nghiệp vụ: <code>raw_multipage_invoice_pdf</code> $\rightarrow$ <code>extracted_invoice_pages</code> $\rightarrow$ <code>categorized_invoices</code> $\rightarrow$ <code>monthly_financial_expense_ledger</code>.</li>
+              <li><strong>Metadata trực tiếp:</strong> Hiển thị ngay trên UI tổng số tiền <code>29.880.000 VNĐ</code>, số trang hợp lệ mà không cần mò log.</li>
             </ul>
           </div>
-          <div class="card">
-            <div class="card-title purple">Thách Thức Mô Phỏng 1-1 Step Functions</div>
-            <ul style="font-size: 14.5px;">
-              <li>Xử lý rẽ nhánh điều kiện If-Else không làm crash luồng.</li>
-              <li>Xử lý Dynamic Mapping số lượng đơn hàng linh hoạt.</li>
-              <li>Gom kết quả (Fan-in) an toàn khi một nhánh bị skip.</li>
-              <li>Đảm bảo khả năng viết test tự động 100% bằng Pytest.</li>
+
+          <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="card-title cyan">🛡️ Asset Checks: Vũ Khí Kiểm Toán Thượng Hạng</div>
+            <ul>
+              <li>3 Check được đính kèm trực tiếp vào Asset dưới dạng các badge kiểm định:
+                <ul>
+                  <li><code>check_pdf_file_integrity</code></li>
+                  <li><code>check_vat_tax_math</code></li>
+                  <li><code>check_budget_limit_compliance</code></li>
+                </ul>
+              </li>
+              <li><strong>Cơ chế <code>blocking=True</code>:</strong> Nếu ngân sách vượt 100M VND, check báo đỏ ngay lập tức và <strong>ngắt luồng tự động</strong>, bảo vệ sổ cái không bị ô nhiễm.</li>
             </ul>
           </div>
         </div>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Để chứng minh năng lực thực tế của hai công cụ, chúng tôi đã xây dựng một kịch bản demo tiêu biểu: Xử lý lô đơn hàng. Pipeline này có đầy đủ các bài toán kinh điển: Đọc batch, rẽ nhánh điều kiện Choice State, phân rã lặp song song Map State và tổng hợp kết quả cuối cùng. Hãy cùng xem code triển khai thực tế trên cả Airflow và Dagster.
-      </div>
-    </div>
 
-    <!-- Slide 12 -->
-    <div class="slide" data-title="12. Phân Tích Code: Apache Airflow">
-      <div class="slide-tag">DEMO & CODE WALKTHROUGH</div>
-      <h2 class="slide-title">Code Demo: Apache Airflow (TaskFlow API)</h2>
-      <div class="slide-body">
-        <div class="code-tabs-wrapper">
-          <div class="code-tabs-header">
-            <span style="font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-right: auto; align-self: center;">
-              📄 airflow_demo/dags/order_processing_dag.py
-            </span>
-          </div>
-          <pre><code class="language-python"># 1. Choice State: Rẽ nhánh bằng @task.branch
-@task.branch
-def check_batch_condition(batch_info: Dict[str, Any]) -> str:
-    if batch_info.get("is_active") and len(batch_info.get("orders", [])) > 0:
-        return "prepare_orders_for_mapping"  # Trả về tên task tiếp theo
-    return "handle_skipped_batch"
-
-# 2. Dynamic Map State: Xử lý từng phần tử
-@task
-def process_single_order(order: Dict[str, Any]) -> Dict[str, Any]:
-    discount = order["amount"] * 0.10 if order["amount"] >= 1000 else 0.0
-    return {**order, "tier": "VIP" if discount > 0 else "STD", "final_price": order["amount"] - discount}
-
-# 3. Fan-in Aggregation: Bắt buộc chỉnh trigger_rule để tránh bị skip
-@task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-def aggregate_results(processed_orders: List[Dict[str, Any]]) -> Dict[str, Any]:
-    return {"total_revenue": sum(item["final_price"] for item in processed_orders)}
-
-# Thiết lập luồng thực thi
-orders_list = prepare_orders_for_mapping(batch_data)
-mapped_orders = process_single_order.expand(order=orders_list)  # .expand() chính là Map State
-summary_result = aggregate_results(mapped_orders)
-</code></pre>
-        </div>
-        <p style="font-size: 13.5px; color: #94a3b8;">
-          ⚠️ <strong>Lưu ý:</strong> Dữ liệu đơn hàng truyền ngầm qua XCom DB; task fan-in bắt buộc phải dùng <code>TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS</code>.
-        </p>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Đây là mã nguồn Airflow viết bằng TaskFlow API hiện đại. Điểm đáng lưu ý là hàm branch trả về chuỗi string là tên của task tiếp theo. Khi hội tụ sau vòng lặp, chúng ta bắt buộc phải nhớ thêm tham số TriggerRule nếu không Airflow sẽ mặc định coi là upstream failed hoặc skipped.
-      </div>
-    </div>
-
-    <!-- Slide 13 -->
-    <div class="slide" data-title="13. Phân Tích Code: Dagster Ops & Jobs">
-      <div class="slide-tag">DEMO & CODE WALKTHROUGH</div>
-      <h2 class="slide-title">Code Demo: Dagster Ops & Jobs (1-1 Step Functions)</h2>
-      <div class="slide-body">
-        <div class="code-tabs-wrapper">
-          <div class="code-tabs-header">
-            <span style="font-size: 12px; font-weight: 700; color: var(--accent-purple); margin-right: auto; align-self: center;">
-              📄 dagster_demo/order_processing/ops_workflow.py
-            </span>
-          </div>
-          <pre><code class="language-python"># 1. Choice State: Multi-Output có điều kiện
-@op(out={"process_branch": Out(list, is_required=False), "skip_branch": Out(str, is_required=False)})
-def check_batch_condition(orders: list, is_active: bool):
-    if is_active and len(orders) > 0:
-        yield Output(orders, output_name="process_branch")
-    else:
-        yield Output("Batch is empty or inactive", output_name="skip_branch")
-
-# 2. Dynamic Map State: Tách luồng bằng DynamicOut
-@op(out=DynamicOut())
-def fan_out_orders(orders: List[Dict[str, Any]]):
-    for order in orders:
-        yield DynamicOutput(order, mapping_key=order["order_id"].replace("-", "_"))
-
-# 3. Kết nối luồng hoàn toàn Type-Safe & Tự nhiên
-@job
-def order_processing_job():
-    orders, is_active = fetch_orders_batch()
-    process_br, skip_br = check_batch_condition(orders, is_active)
-    
-    # Map loop song song & Fan-in gom kết quả bằng .collect()
-    single_orders = fan_out_orders(process_br)
-    processed = single_orders.map(process_single_order)
-    aggregate_results(processed.collect())  # .collect() gom tự động, không cần hack trigger rule
-</code></pre>
+        <div class="card">
+          <div class="card-title purple">So Sánh Trải Nghiệm Demo</div>
+          <p style="font-size: 13.5px;">
+            <strong>Airflow</strong> điều khiển <em>"Tiến trình đang làm gì"</em> (Chạy hàm A, hàm B) — <strong>Dagster</strong> quản lý <em>"Tài sản dữ liệu đang ở đâu, trạng thái chất lượng ra sao"</em>.
+          </p>
         </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Với hướng tiếp cận Ops của Dagster, chúng ta thấy luồng dữ liệu hiển hiện rõ ràng: output của op này là input của op kia. Hàm fan_out_orders phân tách từng item và gọi .map(), sau đó .collect() gom tất cả lại. Code rất tường minh và có kiểu dữ liệu chặt chẽ.
+Bây giờ, hãy nhìn sang giao diện Dagster tại cổng 3000. Đây là điều khác biệt lớn nhất: Thay vì nhìn thấy các tác vụ vô hình, ta nhìn thấy chính xác 'Hóa đơn tháng 3' và 'Sổ cái kế toán'. Đặc biệt, nhìn vào ô monthly_financial_expense_ledger, có 2 chiếc khiên bảo vệ màu xanh: đó là Asset Checks. Nếu kế toán nạp nhầm hóa đơn 120 triệu, chiếc khiên chuyển sang màu đỏ rực, pipeline dừng lại ngay lập tức và ghi rõ lý do vi phạm metadata ngay trên màn hình chính mà không cần lục log.
       </div>
     </div>
 
-    <!-- Slide 14 -->
-    <div class="slide" data-title="14. Phân Tích Code: Dagster Assets">
-      <div class="slide-tag">DEMO & CODE WALKTHROUGH</div>
-      <h2 class="slide-title">Bước Nhảy Vọt: Software-Defined Assets (SDA)</h2>
+    <!-- ==================== SLIDE 6 ==================== -->
+    <div class="slide" data-title="Slide 6: Mổ Xẻ Code Airflow">
+      <div class="slide-badge">PHẦN 3: PHÂN TÍCH CODE & CẤU TẠO AIRFLOW</div>
+      <h2 class="slide-title">Mổ Xẻ File Code Airflow: <code>invoice_multipage_pdf_dag.py</code></h2>
       <div class="slide-body">
-        <div class="code-tabs-wrapper">
-          <div class="code-tabs-header">
-            <span style="font-size: 12px; font-weight: 700; color: var(--accent-green); margin-right: auto; align-self: center;">
-              📄 dagster_demo/order_processing/assets_workflow.py
-            </span>
+        <div class="code-container">
+          <div class="code-header">
+            <span>airflow_demo/dags/invoice_multipage_pdf_dag.py</span>
+            <span>TaskFlow API (Airflow 2.x)</span>
           </div>
-          <pre><code class="language-python">@asset(group_name="orders_pipeline")
-def raw_orders_batch() -> List[Dict[str, Any]]:
-    """Dữ liệu đơn hàng thô lấy từ nguồn."""
-    return fetch_from_source()
+          <pre><code class="language-python"># 1. Định nghĩa DAG
+@dag(dag_id="invoice_multipage_pdf_dag", schedule=None, catchup=False)
+def invoice_multipage_pdf_dag():
 
-@asset(group_name="orders_pipeline")
-def validated_orders(raw_orders_batch: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
-    """Làm sạch, phân loại VIP và đính kèm Metadata trực quan lên Web UI Catalog."""
-    cleaned = [apply_vip_logic(o) for o in raw_orders_batch]
-    
-    metadata = {
-        "total_records": len(cleaned),
-        "vip_records": sum(1 for o in cleaned if o["tier"] == "VIP"),
-        "preview": MetadataValue.json(cleaned[:2]),
-    }
-    return Output(cleaned, metadata=metadata)
+    # 2. Branching: Trả về STRING tên task_id tiếp theo
+    @task.branch
+    def check_file_integrity_and_branch(file_meta: dict):
+        if file_meta.get("is_valid") and file_meta.get("total_pages", 0) > 0:
+            return "extract_pages"
+        return "quarantine_corrupt_pdf"
 
-@asset(group_name="orders_pipeline")
-def batch_summary_report(validated_orders: List[Dict[str, Any]]) -> Output[Dict[str, Any]]:
-    """Báo cáo tổng hợp tài chính lô đơn hàng."""
-    summary = compute_revenue(validated_orders)
-    return Output(summary, metadata={"total_revenue": MetadataValue.float(summary["total_revenue"])})
-</code></pre>
+    # 3. Dynamic Task Mapping (.expand) cho từng nhánh song song
+    @task
+    def extract_vat_invoice(page: dict) -> dict: ...
+    @task
+    def extract_utility_invoice(page: dict) -> dict: ...
+
+    vat_results = extract_vat_invoice.expand(page=vat_pages)
+
+    # 4. Gộp nhánh rác (bị skipped): BẮT BUỘC cấu hình TriggerRule
+    @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
+    def aggregate_monthly_ledger(all_processed_pages: list): ...</code></pre>
         </div>
-        <p style="font-size: 13.5px; color: #cbd5e1;">
-          🌟 <strong>Lợi ích vượt trội:</strong> UI tự sinh Data Lineage; cho phép Re-materialize chỉ riêng báo cáo mà không cần tải lại dữ liệu thô!
-        </p>
+
+        <div class="grid-3" style="margin-top: 4px;">
+          <div class="card" style="padding: 12px 14px;">
+            <div class="card-title cyan" style="font-size: 14px;">1. Trói Chặt Vào Task ID</div>
+            <p style="font-size: 12.5px; color: #cbd5e1;">Hàm rẽ nhánh phải return chuỗi string <code>"extract_pages"</code>, đổi tên task là code bị gãy.</p>
+          </div>
+          <div class="card" style="padding: 12px 14px;">
+            <div class="card-title amber" style="font-size: 14px;">2. XCom Ẩn Dưới Nền</div>
+            <p style="font-size: 12.5px; color: #cbd5e1;">Dữ liệu giữa các task được ngầm nạp (INSERT) vào bảng <code>xcom</code> trong PostgreSQL.</p>
+          </div>
+          <div class="card" style="padding: 12px 14px;">
+            <div class="card-title purple" style="font-size: 14px;">3. TriggerRule Phức Tạp</div>
+            <p style="font-size: 12.5px; color: #cbd5e1;">Nếu không set <code>NONE_FAILED_MIN_ONE_SUCCESS</code>, cả pipeline sẽ bị fail vì nhánh rác bị skip.</p>
+          </div>
+        </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Đây là mô hình Software-Defined Assets - điểm mạnh nhất của Dagster. Thay vì viết task, chúng ta định nghĩa các tài sản dữ liệu. Nhìn vào đây, bất kỳ ai từ developer đến Data Analyst đều thấy được quan hệ cha-con của dữ liệu, kèm theo các chỉ số chất lượng được hiển thị trực quan trên Web UI.
+Hãy mổ xẻ code Airflow mà chúng ta vừa viết: Thứ nhất: @task.branch bắt buộc hàm phải trả về string chứa tên của task_id tiếp theo. Nghĩa là code logic nghiệp vụ bị trói cứng vào tên của task trong DAG. Thứ hai: Để 4 nhánh chạy song song nhưng không bị lỗi khi một vài nhánh không có trang nào, ta phải cấu hình TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS. Nếu quên dòng này, toàn bộ pipeline sẽ bị treo hoặc báo fail do cơ chế mặc định all_success. Thứ ba: Làm sao dữ liệu đi từ hàm này sang hàm kia? Đó là qua cơ chế XCom.
       </div>
     </div>
 
-    <!-- Slide 15 -->
-    <div class="slide" data-title="15. Kiểm Thử Pytest: 1.9 Giây">
-      <div class="slide-tag">KIỂM CHỨNG THỰC TẾ</div>
-      <h2 class="slide-title">Minh Chứng: Chạy Unit Test Pytest Trong 1.9 Giây!</h2>
+    <!-- ==================== SLIDE 7 ==================== -->
+    <div class="slide" data-title="Slide 7: Cấu Tạo Hệ Thống Airflow">
+      <div class="slide-badge">PHẦN 3: PHÂN TÍCH CODE & CẤU TẠO AIRFLOW</div>
+      <h2 class="slide-title">Cấu Tạo 4 Thành Phần Trụ Cột Của Airflow</h2>
       <div class="slide-body">
         <div class="grid-2">
-          <div class="card">
-            <div class="card-title cyan">Code Pytest Trực Tiếp (In-Memory)</div>
-            <pre><code class="language-python"># 1. Test unit 1 op độc lập
-def test_process_single_order_unit():
-    vip = {"order_id": "T1", "amount": 1000}
-    res = process_single_order(vip)
-    assert res["tier"] == "VIP"
-    assert res["final_price"] == 900.0
-
-# 2. Test toàn bộ Job trong RAM
-def test_full_ops_job():
-    res = order_processing_job.execute_in_process()
-    assert res.success
-
-# 3. Test chuỗi Assets bằng materialize
-def test_assets():
-    res = materialize([raw_orders_batch, validated_orders, batch_summary_report])
-    assert res.success
-</code></pre>
+          <div class="flow-box">
+┌────────────────────────────────────────────────────────┐
+│                   APACHE AIRFLOW                       │
+│                                                        │
+│   ┌───────────────┐                  ┌───────────────┐ │
+│   │   Webserver   │                  │   Scheduler   │ │
+│   │   (Flask UI)  │                  │  (Heartbeat)  │ │
+│   └───────┬───────┘                  └───────┬───────┘ │
+│           │                                  │         │
+│           ▼                                  ▼         │
+│     ┌──────────────────────────────────────────────┐   │
+│     │   Metadata Database (PostgreSQL / MySQL)     │   │
+│     │   (DAG Runs, Task Instances, XCom, Variables)│   │
+│     └──────────────────────────────────────────────┘   │
+│                            ▲                           │
+│                            │ Báo cáo trạng thái        │
+│                 ┌──────────┴──────────┐                │
+│                 │   Executor / Worker │                │
+│                 │  (Celery / K8s Pods)│                │
+│                 └─────────────────────┘                │
+└────────────────────────────────────────────────────────┘
           </div>
-          <div class="card">
-            <div class="card-title green">Kết Quả Chạy Thực Tế</div>
-            <div style="background: #000; padding: 16px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px; color: #10b981; line-height: 1.6;">
-              $ PYTHONPATH=. pytest dagster_demo/tests/test_order_processing.py<br>
-              ================ test session starts ================<br>
-              platform linux -- Python 3.12.0, pytest-9.1.1<br>
-              collected 3 items<br><br>
-              dagster_demo/tests/test_order_processing.py ... [100%]<br><br>
-              <span style="color: #4ade80; font-weight: bold;">================ 3 passed in 1.90s ================</span>
+
+          <div class="card" style="justify-content: space-around;">
+            <div>
+              <div class="card-title cyan">1. Scheduler (Bộ não điều phối)</div>
+              <p style="font-size: 13.5px; color: #cbd5e1;">Quét file Python liên tục, xác định task nào sẵn sàng chạy và ném vào hàng đợi (Queue).</p>
             </div>
-            <ul style="font-size: 13.5px; margin-top: 10px;">
-              <li>✅ <strong>Zero Infrastructure:</strong> Không cần Docker, không cần PostgreSQL, không cần mạng internet.</li>
-              <li>✅ Tích hợp hoàn hảo vào quy trình <strong>CI/CD GitHub Actions / GitLab CI</strong>.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Hãy nhìn vào màn hình: Đây là kết quả thực tế khi chúng tôi chạy test bộ code demo này. 3 bài kiểm tra từ test hàm đơn lẻ đến chạy cả pipeline hoàn chỉnh chỉ mất đúng 1.9 giây. Hãy thử tưởng tượng thời gian và chi phí mà đội ngũ của chúng ta tiết kiệm được so với việc phải đẩy lên AWS Step Functions mỗi lần muốn kiểm tra một dòng code!
-      </div>
-    </div>
-
-    <!-- Slide 16 -->
-    <div class="slide" data-title="16. Mở Rộng: Bài Toán Pipeline OCR">
-      <div class="slide-tag">CASE STUDY MỞ RỘNG</div>
-      <h2 class="slide-title">Mở Rộng Thực Tế: Pipeline OCR Nhiều Bước</h2>
-      <div class="slide-body">
-        <div class="card" style="background: rgba(15, 23, 42, 0.6);">
-          <div class="card-title cyan">Quy trình: Ingest (Tách trang/Phân loại) ➔ Process (Bóc tách Hóa đơn chính)</div>
-          <div style="display: flex; justify-content: center; padding: 10px;">
-            <div class="mermaid-box" style="width: 100%;">
-              <div class="mermaid">
-                flowchart LR
-                  A[raw_document.pdf] --> B[extracted_pages]
-                  B --> C[classified_documents]
-                  C -->|Lọc trang hóa đơn| D[main_invoice_pages]
-                  D --> E[ocr_raw_extraction]
-                  E --> F[parsed_invoice_json]
-                  F --> G[validated_invoice_record]
-              </div>
+            <div>
+              <div class="card-title amber">2. Metadata DB (Nút thắt cổ chai)</div>
+              <p style="font-size: 13.5px; color: #cbd5e1;">Mọi thành phần đều phụ thuộc vào DB này. Nếu DB nghẽn hoặc lock bảng, toàn bộ hệ thống tê liệt.</p>
+            </div>
+            <div>
+              <div class="card-title green">3. Webserver & Worker</div>
+              <p style="font-size: 13.5px; color: #cbd5e1;">Webserver chỉ đọc DB để vẽ UI. Worker nhận task chạy trong môi trường riêng rồi ghi log & kết quả về DB.</p>
             </div>
           </div>
         </div>
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title amber">Nếu Dùng Airflow</div>
-            <ul style="font-size: 13.5px;">
-              <li>Không thể truyền ảnh trực tiếp qua XCom (sẽ làm sập Postgres).</li>
-              <li>Phải tự viết code upload từng ảnh cắt ra MinIO, truyền URL qua XCom, task sau tự download lại.</li>
-              <li>Khi sửa model OCR, phải vào UI "Clear Task" thủ công để chạy lại.</li>
-            </ul>
-          </div>
-          <div class="card">
-            <div class="card-title green">Nếu Dùng Dagster (Khuyên Dùng)</div>
-            <ul style="font-size: 13.5px;">
-              <li><code>IOManager</code> tự động trung chuyển ảnh qua MinIO trong suốt.</li>
-              <li><strong>Asset Re-materialization:</strong> Khi tinh chỉnh prompt LLM hay model OCR, chỉ cần chạy lại asset <code>parsed_invoice_json</code> từ ảnh có sẵn trong MinIO!</li>
-              <li>Lưu trực tiếp <code>confidence_score</code> vào Metadata để quan sát trên Web UI.</li>
-            </ul>
-          </div>
-        </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Một trường hợp điển hình trong thực tế là xây dựng pipeline OCR nhiều bước: từ đọc file PDF, tách trang, nhận diện đâu là hóa đơn chính, rồi mới bóc tách dữ liệu bảng biểu. Với bài toán này, Dagster vượt trội hoàn toàn nhờ khả năng quản lý file trung gian qua IOManager và cho phép chạy lại riêng bước bóc tách dữ liệu khi tinh chỉnh prompt/model mà không cần chạy lại bước ingest ban đầu.
+Để hiểu vì sao Airflow gặp khó khăn với các bài toán dữ liệu hiện đại, ta phải nhìn vào cấu tạo 4 thành phần này. Airflow ra đời năm 2014, thời điểm mà người ta chỉ cần một công cụ Cronjob mạnh mẽ để kích hoạt các job Hadoop/Hive chạy ban đêm. Mọi giao tiếp giữa Scheduler, Webserver và Worker đều đi qua một chiếc 'nút cổ chai' duy nhất: Metadata Database PostgreSQL.
       </div>
     </div>
 
-    <!-- Slide 17 -->
-    <div class="slide" data-title="17. So Sánh Đối Đầu Kỹ Thuật">
-      <div class="slide-tag">SO SÁNH TỔNG HỢP</div>
-      <h2 class="slide-title">Bảng So Sánh Đối Đầu Kỹ Thuật Trực Diện</h2>
+    <!-- ==================== SLIDE 8 ==================== -->
+    <div class="slide" data-title="Slide 8: Cơ Chế Hoạt Động Ngầm Airflow">
+      <div class="slide-badge">PHẦN 3: PHÂN TÍCH CODE & CẤU TẠO AIRFLOW</div>
+      <h2 class="slide-title">Cách Chạy Ngầm Cốt Lõi: DAG Parsing Loop & XCom</h2>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title rose">1. Vòng Lặp Phân Tích File (DAG Parsing Loop)</div>
+            <ul>
+              <li>Scheduler <strong>không lưu sẵn đồ thị trên RAM</strong>.</li>
+              <li>Cứ mỗi <strong>30 giây</strong>, một tiến trình con (DAG File Processor) đọc và biên dịch lại toàn bộ code Python trong thư mục <code>dags/</code>.</li>
+              <li>Nếu developer lỡ tay gọi 1 API HTTP hoặc import thư viện OCR nặng ở tầng ngoài $\rightarrow$ <strong>Scheduler bị treo CPU 100%</strong>!</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-title amber">2. Cơ Chế Luân Chuyển Dữ Liệu XCom</div>
+            <ul>
+              <li>Task A: <code>return extracted_data</code></li>
+              <li>Airflow serialize dict/list thành chuỗi JSON/Pickle.</li>
+              <li>Thực hiện lệnh: <code>INSERT INTO xcom VALUES (...)</code> vào Database PostgreSQL.</li>
+              <li>Task B: <code>ti.xcom_pull()</code> $\rightarrow$ <code>SELECT ... FROM xcom</code>.</li>
+              <li>Nếu dữ liệu lớn (ảnh hóa đơn, DataFrame to) $\rightarrow$ <strong>PostgreSQL bị tràn bộ nhớ!</strong></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card" style="border-color: rgba(6, 182, 212, 0.4);">
+          <div class="card-title cyan">Vòng Đời Trạng Thái Của 1 Task Instance</div>
+          <div style="font-family: var(--font-mono); font-size: 13.5px; color: #93c5fd; text-align: center; padding: 6px;">
+            NONE ──► SCHEDULED ──► QUEUED ──► RUNNING ──► SUCCESS / FAILED / SKIPPED
+          </div>
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+Khi một task return về dữ liệu trong Airflow, dữ liệu đó bị biến thành chuỗi text và ném thẳng vào database PostgreSQL của hệ thống. Nếu danh sách hóa đơn lớn hoặc chứa file ảnh base64, database của Airflow sẽ nhanh chóng bị phình to (bloat), làm chậm toàn bộ cụm điều phối!
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 9 ==================== -->
+    <div class="slide" data-title="Slide 9: Hạn Chế 1 - Mù Dữ Liệu">
+      <div class="slide-badge">PHẦN 4: HẠN CHẾ AIRFLOW & DAGSTER CÓ GÌ MỚI?</div>
+      <h2 class="slide-title">Hạn Chế 1: "Mù Dữ Liệu" (Data Blindness)</h2>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="border-color: rgba(244, 63, 94, 0.4);">
+            <div class="card-title rose">🔴 Nỗi Đau Airflow: Task-Centric</div>
+            <ul>
+              <li><strong>Chỉ quan tâm tiến trình:</strong> Task bóc tách hóa đơn chạy xong trả về 0 bản ghi $\rightarrow$ Airflow vẫn báo XANH LÁ CÂY (`SUCCESS`).</li>
+              <li>Kế toán không biết dữ liệu bị rỗng cho đến khi mở báo cáo tài chính cuối tháng.</li>
+              <li>Không có khái niệm "Data Version", không quản lý vòng đời tài sản dữ liệu.</li>
+            </ul>
+          </div>
+
+          <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="card-title green">🟢 Dagster Giải Quyết: Software-Defined Asset (SDA)</div>
+            <ul>
+              <li>Đổi câu hỏi từ: <em>"Chạy task gì?"</em> sang <em>"Tạo ra tài sản dữ liệu gì?"</em>.</li>
+              <li>Mỗi asset khai báo rõ: Schema, phân vùng (partition), metadata số lượng dòng, tổng tiền, thời gian cập nhật.</li>
+              <li>Giao diện theo dõi trung thực: Nhìn vào là biết ngay hóa đơn tháng 3 đã có số liệu hay chưa!</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card" style="background: rgba(30, 41, 59, 0.5);">
+          <div class="card-title cyan">💡 So Sánh Triết Lý</div>
+          <p style="font-size: 14px;">
+            Airflow quản lý <strong>hành động</strong> (Verbs - Action). Dagster quản lý <strong>kết quả dữ liệu</strong> (Nouns - Data Assets). Với doanh nghiệp, dữ liệu đúng mới là giá trị cuối cùng.
+          </p>
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+Điểm hạn chế đầu tiên sinh ra từ cấu tạo Task-centric: Airflow hoàn toàn 'mù' về dữ liệu. Với kế toán, họ không cần biết bạn chạy bao nhiêu Task, họ chỉ cần biết: 'Hóa đơn tháng 3 đã sẵn sàng chưa và số liệu có chuẩn không?'. Dagster đưa Dữ liệu trở thành công dân hạng nhất, phản ánh trung thực giá trị nghiệp vụ.
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 10 ==================== -->
+    <div class="slide" data-title="Slide 10: Hạn Chế 2 - Cực Hình Viết Test">
+      <div class="slide-badge">PHẦN 4: HẠN CHẾ AIRFLOW & DAGSTER CÓ GÌ MỚI?</div>
+      <h2 class="slide-title">Hạn Chế 2: Cực Hình Khi Viết Test & Local Debug</h2>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="border-color: rgba(244, 63, 94, 0.4);">
+            <div class="card-title rose">🔴 Nỗi Đau Airflow: Dính Chặt Vào Database</div>
+            <ul>
+              <li>Hàm Python của Airflow bị "ô nhiễm" bởi <code>context</code>, <code>ti</code>, <code>xcom_pull</code>.</li>
+              <li>Chạy <code>pytest</code> đơn thuần sẽ văng lỗi <code>KeyError: 'ti'</code>.</li>
+              <li>Muốn Integration Test cả DAG: <strong>Bắt buộc phải khởi tạo SQLite/PostgreSQL</strong>, chạy <code>airflow db migrate</code> nặng nề trong CI/CD.</li>
+            </ul>
+          </div>
+
+          <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="card-title green">🟢 Dagster Giải Quyết: Pure Function & Pytest 0.05s</div>
+            <ul>
+              <li>Asset bản chất là <strong>hàm Python thuần khiết</strong>.</li>
+              <li>Unit test: Gọi thẳng hàm như code Python lớp 1: <code>extracted_invoice_pages(mock_input)</code>.</li>
+              <li>Integration test: Dùng <code>materialize([asset1, asset2])</code> chạy hoàn toàn trong bộ nhớ RAM, <strong>KHÔNG CẦN DATABASE, KHÔNG CẦN SERVER!</strong></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="code-container" style="max-height: 200px;">
+          <div class="code-header">
+            <span>dagster_demo/tests/test_invoice_processing.py</span>
+            <span>Pytest - 4/4 Tests Passed in 0.12s</span>
+          </div>
+          <pre><code class="language-python">def test_full_invoice_pipeline():
+    result = materialize([raw_multipage_invoice_pdf, extracted_invoice_pages, categorized_invoices])
+    assert result.success # Chạy trọn vẹn trong RAM, không sinh file rác!</code></pre>
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+Đây chính là câu trả lời vì sao Dagster lại dễ test hơn Airflow gấp 10 lần. Trong file test_invoice_processing.py, chúng ta vừa chạy 4 bài test chỉ trong 0.12 giây bằng Pytest. Không cần mở Webserver, không cần Postgres, không sinh ra một file rác nào trên ổ cứng. Lập trình viên có thể viết test TDD ngay trên máy cá nhân trước khi đẩy code lên Git.
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 11 ==================== -->
+    <div class="slide" data-title="Slide 11: Hạn Chế 3 - Nghẽn Cổ Chai XCom">
+      <div class="slide-badge">PHẦN 4: HẠN CHẾ AIRFLOW & DAGSTER CÓ GÌ MỚI?</div>
+      <h2 class="slide-title">Hạn Chế 3: Nghẽn Cổ Chai XCom & Ô Nhiễm Code Lưu Trữ</h2>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="border-color: rgba(244, 63, 94, 0.4);">
+            <div class="card-title rose">🔴 Nỗi Đau Airflow: Dữ Liệu Bị Ép Qua DB</div>
+            <ul>
+              <li>XCom lưu vào Postgres $\rightarrow$ Dung lượng bị bóp nghẹt vài MB.</li>
+              <li>Muốn lưu file to (PDF, ảnh scan, Parquet): Developer phải tự tay viết code upload S3/MinIO, rồi truyền chuỗi URL qua XCom.</li>
+              <li><strong>Hậu quả:</strong> Code logic nghiệp vụ bị trộn lẫn với code hạ tầng lưu trữ.</li>
+            </ul>
+          </div>
+
+          <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="card-title green">🟢 Dagster Giải Quyết: I/O Manager (Cắm - Rút)</div>
+            <ul>
+              <li>Tách rời 100% giữa <strong>Logic tính toán</strong> và <strong>Vị trí lưu trữ</strong>.</li>
+              <li>Hàm Python chỉ làm toán thuần: <code>return invoice_summary</code>.</li>
+              <li><strong>Production:</strong> I/O Manager tự đẩy lên S3 / MinIO / PostgreSQL.</li>
+              <li><strong>Unit Test:</strong> I/O Manager tự giữ trong RAM (In-Memory).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title cyan">Lợi Ích Của Nguyên Lý Dependency Injection</div>
+          <p style="font-size: 14px;">
+            Khi chuyển đổi kho lưu trữ từ MinIO sang Ceph hay S3, lập trình viên <strong>không phải sửa bất kỳ dòng code nào</strong> trong các hàm Asset. Chỉ cần đổi 1 dòng cấu hình I/O Manager!
+          </p>
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+I/O Manager của Dagster là một cuộc cách mạng về thiết kế phần mềm (Dependency Injection). Lập trình viên chỉ cần return df hoặc return invoice_dict. Việc lưu nó vào MinIO, S3 hay Postgres là do I/O Manager đảm nhận bên ngoài. Khi test, ta rút S3 ra và cắm RAM vào, cực kỳ linh hoạt.
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 12 ==================== -->
+    <div class="slide" data-title="Slide 12: Hạn Chế 4 - Monolithic Parsing">
+      <div class="slide-badge">PHẦN 4: HẠN CHẾ AIRFLOW & DAGSTER CÓ GÌ MỚI?</div>
+      <h2 class="slide-title">Hạn Chế 4: Monolithic Parsing & Rủi Ro Sập Cụm</h2>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="border-color: rgba(244, 63, 94, 0.4);">
+            <div class="card-title rose">🔴 Nỗi Đau Airflow: Dễ "Chết Chùm"</div>
+            <ul>
+              <li>Scheduler đọc trực tiếp code Python của người dùng vào cùng tiến trình hệ thống.</li>
+              <li>Nếu 1 file DAG bị lỗi cú pháp, gọi thư viện C bị lỗi, hoặc chiếm dụng RAM $\rightarrow$ <strong>Làm đứng luôn Scheduler và Webserver</strong>.</li>
+              <li>Tất cả các team phải dùng chung 1 môi trường Python (Dependency Hell).</li>
+            </ul>
+          </div>
+
+          <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="card-title green">🟢 Dagster Giải Quyết: gRPC Out-of-Process & Daemon</div>
+            <ul>
+              <li>Hệ thống tách làm 2 tầng hoàn toàn độc lập:
+                <ul>
+                  <li><strong>Hạ tầng quản lý:</strong> Dagster Webserver + Dagster Daemon.</li>
+                  <li><strong>Code người dùng:</strong> Chạy trong các Container riêng (Code Locations) kết nối qua gRPC.</li>
+                </ul>
+              </li>
+              <li>Code lỗi cú pháp hay sập container $\rightarrow$ Web UI vẫn sáng đèn, báo lỗi cách ly an toàn!</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title purple">Ý Nghĩa Sống Còn Trên Cụm Kubernetes On-Premise</div>
+          <p style="font-size: 14px;">
+            Team Hóa đơn có thể dùng <strong>Python 3.12 + PyMuPDF</strong>, trong khi Team AI dùng <strong>Python 3.9 + PyTorch</strong>. Hai team deploy 2 Pod riêng biệt, không bao giờ lo xung đột thư viện!
+          </p>
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+Về mặt DevOps và bảo mật hệ thống, kiến trúc tách rời của Dagster ăn đứt Airflow. Trên Kubernetes, mỗi team có thể deploy một Code Location Pod riêng với thư viện Python độc lập. Team Hóa đơn dùng Python 3.12 không sợ bị xung đột thư viện với Team Machine Learning dùng Python 3.9.
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 13 ==================== -->
+    <div class="slide" data-title="Slide 13: Hạn Chế 5 - Thiếu Data Quality">
+      <div class="slide-badge">PHẦN 4: HẠN CHẾ AIRFLOW & DAGSTER CÓ GÌ MỚI?</div>
+      <h2 class="slide-title">Hạn Chế 5: Thiếu Kiểm Định Dữ Liệu Tích Hợp</h2>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="border-color: rgba(244, 63, 94, 0.4);">
+            <div class="card-title rose">🔴 Nỗi Đau Airflow: Phải Đẻ Thêm Hàng Tá Task Phụ</div>
+            <ul>
+              <li>Airflow không có khái niệm Data Quality tích hợp.</li>
+              <li>Muốn kiểm tra ngân sách hay tính thuế: Developer phải tự tạo thêm <code>check_vat_task</code>, <code>branch_budget_task</code>.</li>
+              <li>Đồ thị DAG bị phình to bởi các task rác kiểm tra, làm luồng nghiệp vụ bị rối rắm.</li>
+            </ul>
+          </div>
+
+          <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="card-title green">🟢 Dagster Giải Quyết: First-Class Asset Checks</div>
+            <ul>
+              <li>Kiểm định đính kèm trực tiếp vào Asset:</li>
+            </ul>
+            <div class="code-container" style="max-height: 140px; margin-top: 6px;">
+              <pre><code class="language-python">@asset_check(asset=monthly_financial_expense_ledger, blocking=True)
+def check_budget_limit_compliance(monthly_financial_expense_ledger: dict):
+    total = monthly_financial_expense_ledger.get("grand_total", 0)
+    return AssetCheckResult(passed=(0 < total <= 100_000_000))</code></pre>
+            </div>
+            <ul style="margin-top: 8px;">
+              <li><strong><code>blocking=True</code>:</strong> Tự động ngắt luồng tại chỗ nếu phát hiện vi phạm!</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title cyan">Khả Năng Quan Sát Dữ Liệu (Data Observability)</div>
+          <p style="font-size: 14px;">
+            Lịch sử các lần Pass/Fail của Asset Check được lưu lại thành biểu đồ xu hướng theo thời gian, giúp kiểm toán viên đối soát chất lượng dữ liệu tức thì.
+          </p>
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+Với Airflow, muốn kiểm định dữ liệu ta phải viết các hàm rẽ nhánh phức tạp. Với Dagster, @asset_check là công dân hạng nhất. Nó vừa kiểm tra, vừa ghi nhận điểm số chất lượng (Data Observability), vừa có quyền lực tối cao để chặn đứng pipeline khi có rủi ro tài chính.
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 14 ==================== -->
+    <div class="slide" data-title="Slide 14: Ma Trận So Sánh Tổng Hợp">
+      <div class="slide-badge">PHẦN 5: KẾT LUẬN & ĐỀ XUẤT</div>
+      <h2 class="slide-title">Ma Trận So Sánh Kỹ Thuật Tổng Hợp (7 Tiêu Chí)</h2>
       <div class="slide-body">
         <table class="styled-table">
           <thead>
             <tr>
               <th>Tiêu Chí Kỹ Thuật</th>
-              <th>Apache Airflow</th>
+              <th>Apache Airflow 2.x</th>
               <th>Dagster</th>
+              <th style="text-align: center;">Đánh Giá</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><strong>Mô hình trọng tâm</strong></td>
-              <td>Task & Execution Flow</td>
-              <td><strong>Data Assets & Lineage</strong></td>
+              <td><strong>1. Triết lý thiết kế</strong></td>
+              <td>Task-Centric (Chạy tác vụ)</td>
+              <td>Asset-Centric (Tài sản dữ liệu)</td>
+              <td style="text-align: center; color: var(--accent-green);">Dagster thắng</td>
             </tr>
             <tr>
-              <td><strong>Truyền nhận dữ liệu trung gian</strong></td>
-              <td>Hạn chế (XCom qua Postgres/Redis)</td>
-              <td><strong>Xuất sắc (IOManager tự động qua MinIO/S3)</strong></td>
+              <td><strong>2. Khả năng & Tốc độ Test</strong></td>
+              <td>Phụ thuộc DB, chậm, khó mock</td>
+              <td>Pure Function, chạy Pytest trong RAM 0.05s</td>
+              <td style="text-align: center; color: var(--accent-green); font-weight: 700;">Dagster vượt trội</td>
             </tr>
             <tr>
-              <td><strong>Hỗ trợ Unit Test & CI/CD</strong></td>
-              <td>Trung bình (cần mock context/cluster)</td>
-              <td><strong>Tuyệt vời (Hỗ trợ native Pytest, chạy trong RAM)</strong></td>
+              <td><strong>3. Luân chuyển dữ liệu</strong></td>
+              <td>XCom nghẽn qua Database</td>
+              <td>I/O Manager tách rời lưu trữ</td>
+              <td style="text-align: center; color: var(--accent-green);">Dagster thắng</td>
             </tr>
             <tr>
-              <td><strong>Kiến trúc cách ly (Multi-tenant)</strong></td>
-              <td>Phụ thuộc K8sExecutor (Pod overhead)</td>
-              <td><strong>Code Location phân tách triệt để qua gRPC</strong></td>
+              <td><strong>4. Kiểm soát chất lượng</strong></td>
+              <td>Tự viết task phụ rườm rà</td>
+              <td>Asset Checks tích hợp (blocking=True)</td>
+              <td style="text-align: center; color: var(--accent-green);">Dagster thắng</td>
             </tr>
             <tr>
-              <td><strong>Hệ sinh thái & Connectors</strong></td>
-              <td><strong>Rất lớn (>1000 providers)</strong></td>
-              <td>Đang phát triển mạnh, đủ cho Modern Data Stack</td>
+              <td><strong>5. Cách ly hạ tầng (K8s)</strong></td>
+              <td>Chung tiến trình, dễ xung đột thư viện</td>
+              <td>gRPC Out-of-process, cô lập hoàn hảo</td>
+              <td style="text-align: center; color: var(--accent-green);">Dagster thắng</td>
             </tr>
             <tr>
-              <td><strong>Khả năng quan sát chất lượng Data</strong></td>
-              <td>Cần tích hợp công cụ thứ 3</td>
-              <td><strong>Tích hợp sẵn (Asset Catalog, Data Quality, SLAs)</strong></td>
+              <td><strong>6. Hệ sinh thái & Connector</strong></td>
+              <td>Khổng lồ (hơn 10 năm phát triển)</td>
+              <td>Trẻ hơn nhưng phát triển rất nhanh</td>
+              <td style="text-align: center; color: var(--accent-cyan);">Airflow thắng</td>
+            </tr>
+            <tr>
+              <td><strong>7. Trải nghiệm Developer</strong></td>
+              <td>Nhiều boilerplate, debug khó</td>
+              <td>Chuẩn Software Engineering hiện đại</td>
+              <td style="text-align: center; color: var(--accent-green);">Dagster thắng</td>
             </tr>
           </tbody>
         </table>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Bảng tổng hợp này thể hiện rõ sự đánh đổi: Airflow thắng thế về độ phổ biến trên thị trường và số lượng connector có sẵn. Nhưng Dagster chiến thắng áp đảo về năng lực kỹ thuật: cách truyền dữ liệu, kiến trúc cách ly, hỗ trợ kiểm thử và khả năng quan sát chất lượng dữ liệu.
+Nhìn vào bảng tổng kết 7 tiêu chí: Airflow chỉ còn giữ ưu thế duy nhất về tuổi đời và số lượng connector có sẵn. Trên toàn bộ các khía cạnh về năng suất lập trình, khả năng kiểm thử, độ tin cậy dữ liệu và kiến trúc đám mây On-Premise, Dagster đều vượt trội hoàn toàn.
       </div>
     </div>
 
-    <!-- Slide 18 -->
-    <div class="slide" data-title="18. Ma Trận Quyết Định & Chấm Điểm">
-      <div class="slide-tag">ĐÁNH GIÁ RA QUYẾT ĐỊNH</div>
-      <h2 class="slide-title">Ma Trận Quyết Định Có Trọng Số</h2>
-      <div class="slide-body">
-        <table class="styled-table">
-          <thead>
-            <tr>
-              <th>Tiêu Chí Đánh Giá</th>
-              <th>Trọng Số</th>
-              <th>AWS Step Functions</th>
-              <th>Apache Airflow</th>
-              <th>Dagster</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Tối ưu chi phí dài hạn On-Premise</strong></td>
-              <td>20%</td>
-              <td>5.0 / 10</td>
-              <td><strong>9.0 / 10</strong></td>
-              <td><strong>9.0 / 10</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Trải nghiệm Local Dev & Testing (Pytest)</strong></td>
-              <td>20%</td>
-              <td>4.0 / 10</td>
-              <td>6.5 / 10</td>
-              <td><strong>9.5 / 10</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Quản lý luân chuyển Data / State</strong></td>
-              <td>15%</td>
-              <td>7.0 / 10</td>
-              <td>6.5 / 10</td>
-              <td><strong>9.5 / 10</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Độ ổn định kiến trúc On-Prem K8s</strong></td>
-              <td>15%</td>
-              <td>0.0 / 10</td>
-              <td>8.5 / 10</td>
-              <td><strong>9.0 / 10</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Khả năng quan sát Data Lineage & Quality</strong></td>
-              <td>15%</td>
-              <td>7.0 / 10</td>
-              <td>6.5 / 10</td>
-              <td><strong>9.5 / 10</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Mức độ phổ biến & Tuyển dụng</strong></td>
-              <td>15%</td>
-              <td>8.5 / 10</td>
-              <td><strong>9.5 / 10</strong></td>
-              <td>7.5 / 10</td>
-            </tr>
-            <tr style="background: rgba(6, 182, 212, 0.15); font-weight: 800;">
-              <td><strong>TỔNG ĐIỂM CÓ TRỌNG SỐ</strong></td>
-              <td><strong>100%</strong></td>
-              <td><strong>5.3 / 10</strong></td>
-              <td><strong>7.8 / 10</strong></td>
-              <td style="color: var(--accent-cyan); font-size: 16px;"><strong>🏆 9.0 / 10</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Khi đưa vào ma trận chấm điểm có trọng số, Dagster đạt 9.0 điểm, vượt qua Airflow (7.8) và Step Functions (5.3). Điểm số này phản ánh đúng nhu cầu cốt lõi của chúng ta: xây dựng một hệ thống dữ liệu hiện đại, tự chủ và có năng suất phát triển cao.
-      </div>
-    </div>
-
-    <!-- Slide 19 -->
-    <div class="slide" data-title="19. Lộ Trình Triển Khai 3 Giai Đoạn">
-      <div class="slide-tag">LỘ TRÌNH THỰC THI</div>
-      <h2 class="slide-title">Lộ Trình Triển Khai 3 Giai Đoạn (Zero-Downtime)</h2>
-      <div class="slide-body">
-        <div class="grid-3">
-          <div class="card" style="border-top: 4px solid var(--accent-cyan);">
-            <div class="card-title cyan">Giai Đoạn 1: PoC & Hạ Tầng</div>
-            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">(Tuần 1 - 4)</div>
-            <ul>
-              <li>Dựng cụm K8s nội bộ, MinIO HA Cluster và PostgreSQL HA.</li>
-              <li>Deploy Dagster bằng Helm Chart tiêu chuẩn.</li>
-              <li>Thử nghiệm di chuyển 1-2 pipeline tiêu biểu (Order Processing & OCR).</li>
-            </ul>
-          </div>
-          <div class="card" style="border-top: 4px solid var(--accent-purple);">
-            <div class="card-title purple">Giai Đoạn 2: Chạy Song Song</div>
-            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">(Tuần 5 - 8)</div>
-            <ul>
-              <li>Chạy song song cả AWS Step Functions và Dagster On-Premise.</li>
-              <li>Kiểm chứng 100% tính toàn vẹn dữ liệu (Data Consistency Check).</li>
-              <li>Kiểm tra kịch bản chịu tải cao và diễn tập phục hồi thảm họa (DR).</li>
-            </ul>
-          </div>
-          <div class="card" style="border-top: 4px solid var(--accent-green);">
-            <div class="card-title green">Giai Đoạn 3: Cutover & Tắt Cloud</div>
-            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">(Tuần 9 - 12)</div>
-            <ul>
-              <li>Chuyển toàn bộ lịch trình và trigger chính thức sang On-Premise.</li>
-              <li>Ngắt kết nối Step Functions, tắt tài nguyên AWS để tối ưu chi phí.</li>
-              <li>Bàn giao tài liệu vận hành và đào tạo toàn diện cho đội ngũ.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div class="speaker-note-data" style="display:none;">
-        Chúng tôi đề xuất lộ trình chuyển đổi 12 tuần được chia làm 3 giai đoạn rõ ràng. Điểm then chốt là Giai đoạn 2 - Chạy song song: chúng ta sẽ cho cả hai hệ thống cùng chạy để kiểm tra độ tin cậy và tính nhất quán của dữ liệu trước khi chính thức tắt dịch vụ trên AWS, đảm bảo an toàn tuyệt đối và zero downtime.
-      </div>
-    </div>
-
-    <!-- Slide 20 -->
-    <div class="slide" data-title="20. Q&A & Kế Hoạch Tiếp Theo">
-      <div class="slide-tag">KẾT LUẬN & HÀNH ĐỘNG</div>
-      <h2 class="slide-title">Q&A & Kế Hoạch Tiếp Theo (Action Items)</h2>
+    <!-- ==================== SLIDE 15 ==================== -->
+    <div class="slide" data-title="Slide 15: Khi Nào Dùng Ai?">
+      <div class="slide-badge">PHẦN 5: KẾT LUẬN & ĐỀ XUẤT</div>
+      <h2 class="slide-title">Định Vị Ứng Dụng: Khi Nào Nên Chọn Ai?</h2>
       <div class="slide-body">
         <div class="grid-2">
-          <div class="card">
-            <div class="card-title cyan">💡 3 Câu Hỏi Thường Gặp</div>
-            <ul style="font-size: 14px;">
-              <li><strong>Học Dagster có khó không?</strong> ➔ Rất dễ! Dagster viết bằng Python thuần (Pythonic), kỹ sư Python chỉ mất 2-3 ngày là tự tin viết pipeline.</li>
-              <li><strong>Hạ tầng cụm PoC cần gì?</strong> ➔ 3 Master Nodes, 5 Worker Nodes (K8s) cùng 1 cụm MinIO phân tán.</li>
-              <li><strong>Tích hợp CI/CD ra sao?</strong> ➔ Tích hợp tự nhiên vào GitLab CI / Jenkins qua lệnh `pytest`.</li>
+          <div class="card" style="background: rgba(30, 41, 59, 0.4);">
+            <div class="card-title cyan">Khi Nào Nên Chọn Apache Airflow?</div>
+            <ul>
+              <li><strong>Điều phối hạ tầng chung chung:</strong> Bật/tắt máy ảo, trigger job dbt, gửi email báo cáo hàng ngày.</li>
+              <li><strong>Đã có sẵn cụm vận hành ổn định:</strong> Doanh nghiệp đã đầu tư hạ tầng và đội ngũ quen thuộc với Airflow nhiều năm.</li>
+              <li><strong>Các job chạy độc lập (Coarse-grained):</strong> Không cần truyền dữ liệu lớn giữa các bước, mỗi bước là một job Spark riêng biệt.</li>
             </ul>
           </div>
-          <div class="card">
-            <div class="card-title green">✅ Đề Xuất Phê Duyệt Ngay</div>
-            <ul style="font-size: 14px;">
-              <li>1. <strong>Chốt lựa chọn Dagster</strong> làm nền tảng On-Premise Orchestration chính thức.</li>
-              <li>2. <strong>Cấp phát tài nguyên Kubernetes</strong> cho môi trường PoC trong tuần này.</li>
-              <li>3. Bắt đầu Giai đoạn 1 vào đầu tháng tới với nhóm nòng cốt.</li>
+
+          <div class="card" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.05);">
+            <div class="card-title green">Khi Nào Nên Chọn Dagster? (ĐỀ XUẤT SỐ 1)</div>
+            <ul>
+              <li><strong>Thay thế AWS Step Functions:</strong> Các pipeline xử lý nghiệp vụ phức tạp, phân nhánh nhiều điều kiện và tính toán logic.</li>
+              <li><strong>Data Platform, OCR & AI/LLM:</strong> Các quy trình đòi hỏi kiểm soát chặt chẽ chất lượng dữ liệu, đối soát tài chính.</li>
+              <li><strong>Đội ngũ chú trọng CI/CD & Unit Test:</strong> Cần test tự động trên máy local và GitHub Actions mà không tốn công dựng DB.</li>
+              <li><strong>Môi trường Kubernetes đa nhóm:</strong> Cần cô lập phiên bản Python giữa các phòng ban.</li>
             </ul>
           </div>
         </div>
-        <p style="text-align: center; font-size: 20px; font-weight: 700; color: var(--accent-cyan); margin-top: 15px;">
-          CẢM ƠN CÁC ANH CHỊ ĐÃ LẮNG NGHE! XIN MỜI ĐẶT CÂU HỎI!
-        </p>
+
+        <div class="card" style="border-color: rgba(6, 182, 212, 0.4);">
+          <div class="card-title purple">Khuyến Nghị Cuối Cùng Cho Dự Án</div>
+          <p style="font-size: 14px;">
+            Với bài toán di chuyển từ AWS Step Functions về On-Premise: <strong>Dagster là giải pháp tối ưu nhất</strong>, vừa giúp tái hiện chuẩn xác State Machine vừa nâng tầm văn hóa kỹ nghệ phần mềm của đội ngũ!
+          </p>
+        </div>
       </div>
+
       <div class="speaker-note-data" style="display:none;">
-        Cảm ơn các anh chị em ban lãnh đạo đã chú ý lắng nghe. Tôi xin phép mở phần Q&A để giải đáp mọi thắc mắc kỹ thuật cũng như lộ trình triển khai. Rất mong nhận được sự ủng hộ và phê duyệt của ban lãnh đạo cho dự án này!
+Chúng tôi không nói Airflow tệ. Nếu công ty chỉ cần một công cụ kích hoạt dbt hay chạy job Spark hàng đêm, Airflow vẫn dùng tốt. Nhưng với bài toán thay thế AWS Step Functions trên On-Premise: xử lý OCR văn bản, phân loại hồ sơ và kiểm soát rủi ro tài chính, Dagster chính là sự lựa chọn số 1 của tương lai.
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 16 ==================== -->
+    <div class="slide" data-title="Slide 16: Lộ Trình Triển Khai">
+      <div class="slide-badge">PHẦN 5: KẾT LUẬN & ĐỀ XUẤT</div>
+      <h2 class="slide-title">Lộ Trình Triển Khai 3 Giai Đoạn Lên On-Premise / K8s</h2>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-title cyan">Giai Đoạn 1 (Tháng 1 - 2)</div>
+            <p style="font-size: 13.5px; font-weight: 600; color: #f8fafc;">Chuẩn Hóa & Pilot</p>
+            <ul>
+              <li>Dựng cụm Dagster trên Kubernetes On-Premise bằng Helm Chart chuẩn.</li>
+              <li>Di chuyển 2 pipeline trọng điểm: OCR Hóa đơn PDF & Báo cáo đối soát chi phí.</li>
+              <li>Kiểm thử hiệu năng và độ ổn định.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-title amber">Giai Đoạn 2 (Tháng 3 - 4)</div>
+            <p style="font-size: 13.5px; font-weight: 600; color: #f8fafc;">CI/CD & Data Quality</p>
+            <ul>
+              <li>Tích hợp bộ test <code>pytest</code> vào GitLab CI / GitHub Actions tự động.</li>
+              <li>Cấu hình I/O Manager kết nối kho MinIO nội bộ.</li>
+              <li>Đào tạo đội ngũ Data & Backend chuyển đổi tư duy sang Software-Defined Assets.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-title green">Giai Đoạn 3 (Tháng 5 - 6)</div>
+            <p style="font-size: 13.5px; font-weight: 600; color: #f8fafc;">Chuyển Toàn Diện & Cắt AWS</p>
+            <ul>
+              <li>Di chuyển 100% các luồng nghiệp vụ còn lại về On-Premise.</li>
+              <li>Tắt bỏ hoàn toàn các State Machine trên AWS Step Functions.</li>
+              <li><strong>Tiết kiệm ~65% chi phí</strong> vận hành định kỳ hàng tháng!</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 10px; background: rgba(30, 41, 59, 0.4);">
+          <div class="card-title purple">Cam Kết Bảo Đảm</div>
+          <p style="font-size: 13.5px;">
+            Quá trình chuyển dịch chạy song song (Parallel Run) trong 2 tuần đầu để đối chiếu độ chính xác 100% trước khi ngắt kết nối hệ thống cũ, đảm bảo không có gián đoạn kinh doanh.
+          </p>
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+Lộ trình di chuyển được thiết kế an toàn trong 3 giai đoạn, không gây gián đoạn hệ thống hiện tại. Việc chuyển dịch này vừa giúp doanh nghiệp làm chủ dữ liệu trên On-Premise, vừa nâng cao chất lượng code của đội ngũ kỹ sư lên chuẩn mực kỹ nghệ phần mềm chuyên nghiệp.
+      </div>
+    </div>
+
+    <!-- ==================== SLIDE 17 ==================== -->
+    <div class="slide" data-title="Slide 17: Tổng Kết & Q&A">
+      <div class="slide-badge">PHẦN 5: KẾT LUẬN & ĐỀ XUẤT</div>
+      <h2 class="slide-title" style="font-size: 34px;">Tổng Kết & Sẵn Sàng Trả Lời Câu Hỏi (Q&A)</h2>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="justify-content: center; gap: 16px;">
+            <div class="card-title cyan">📦 Tài Nguyên & Mã Nguồn Demo Có Sẵn</div>
+            <ul>
+              <li><strong>Airflow DAG:</strong> <code>airflow_demo/dags/invoice_multipage_pdf_dag.py</code></li>
+              <li><strong>Dagster Assets:</strong> <code>dagster_demo/invoice_processing/assets.py</code></li>
+              <li><strong>Unit Tests:</strong> <code>dagster_demo/tests/test_invoice_processing.py</code> (100% Passed)</li>
+              <li><strong>Tài liệu chi tiết:</strong> <code>DOCS_Y_TUONG_VA_CAC_BUOC_DU_AN.md</code></li>
+            </ul>
+          </div>
+
+          <div class="card" style="justify-content: center; align-items: center; text-align: center; gap: 14px; background: rgba(6, 182, 212, 0.08); border-color: rgba(6, 182, 212, 0.4);">
+            <div style="font-size: 40px;">💬</div>
+            <div style="font-size: 22px; font-weight: 800; color: #ffffff;">Q&A THẢO LUẬN</div>
+            <p style="font-size: 14px; color: #cbd5e1; max-width: 360px;">
+              Rất mong nhận được các câu hỏi, góp ý và thảo luận chuyên sâu từ Ban Lãnh Đạo và các Anh Chị Em đồng nghiệp!
+            </p>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 10px; font-size: 14px; color: var(--text-dim);">
+          Cảm ơn mọi người đã chú ý theo dõi!
+        </div>
+      </div>
+
+      <div class="speaker-note-data" style="display:none;">
+Xin trân trọng cảm ơn mọi người đã chú ý lắng nghe. Xin mời các anh chị đặt câu hỏi hoặc yêu cầu demo trực tiếp vào bất kỳ đoạn code nào!
       </div>
     </div>
 
   </main>
 
-  <!-- Speaker Notes Modal -->
-  <div id="notes-modal">
-    <div class="notes-header">
-      <span>🎙️ SPEAKER NOTES</span>
-      <button id="closeNotesBtn" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 16px;">✕</button>
-    </div>
-    <div class="notes-body" id="notesContent">
-      Lời thoại diễn giả hiển thị ở đây...
-    </div>
-  </div>
-
-  <!-- Footer -->
+  <!-- Footer & Controls -->
   <footer>
-    <div class="nav-controls">
-      <button class="btn-nav" id="prevBtn" title="Slide trước (Mũi tên trái)">❮ Trước</button>
-      <button class="btn-nav" id="nextBtn" title="Slide tiếp theo (Mũi tên phải hoặc Space)">Tiếp Theo ❯</button>
+    <div class="nav-buttons">
+      <button class="btn" id="prevBtn" title="Slide trước (← hoặc PageUp)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Trước
+      </button>
+      <button class="btn btn-primary" id="nextBtn" title="Slide tiếp (→ hoặc Space)">
+        Tiếp
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
     </div>
+
     <div class="progress-wrapper">
       <div class="progress-bar">
         <div class="progress-fill" id="progressFill"></div>
       </div>
-      <div class="slide-counter" id="slideCounter">1 / 20</div>
+      <div class="progress-labels">
+        <select class="slide-select" id="slideSelect"></select>
+        <span id="slideCounter">1 / 17</span>
+      </div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn" id="toggleNotesBtn" title="Bật/tắt Speaker Notes (Phím N)">
+        🎙️ Ghi chú (N)
+      </button>
+      <button class="btn" id="fullscreenBtn" title="Toàn màn hình (Phím F)">
+        ⛶ Toàn màn hình (F)
+      </button>
     </div>
   </footer>
 
-  <!-- Interactive JavaScript Logic -->
-  <script>
-    // Initialize syntax highlighting
-    hljs.highlightAll();
+  <!-- Speaker Notes Modal -->
+  <div id="notes-modal">
+    <div class="notes-header">
+      <span>🎙️ Lời Thoại Diễn Giả (Speaker Notes)</span>
+      <span class="notes-close" id="closeNotesBtn">&times;</span>
+    </div>
+    <div class="notes-content" id="notesContent">
+      Đang tải ghi chú...
+    </div>
+  </div>
 
-    // Initialize Mermaid diagrams
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: 'dark',
-      themeVariables: {
-        darkMode: true,
-        background: 'transparent',
-        primaryColor: '#06b6d4',
-        lineColor: '#94a3b8',
-      }
-    });
+  <script>
+    // Initialize Highlight.js
+    hljs.highlightAll();
 
     const slides = document.querySelectorAll('.slide');
     const totalSlides = slides.length;
@@ -1424,7 +1324,7 @@ def test_assets():
     const slideSelect = document.getElementById('slideSelect');
     const slideCounter = document.getElementById('slideCounter');
     const progressFill = document.getElementById('progressFill');
-    const notesModal = document.getElementById('notesModal') || document.getElementById('notes-modal');
+    const notesModal = document.getElementById('notes-modal');
     const notesContent = document.getElementById('notesContent');
     const toggleNotesBtn = document.getElementById('toggleNotesBtn');
     const closeNotesBtn = document.getElementById('closeNotesBtn');
@@ -1483,14 +1383,12 @@ def test_assets():
       }
     });
 
-    // Notes toggle
     function toggleNotes() {
       notesModal.classList.toggle('show');
     }
     toggleNotesBtn.addEventListener('click', toggleNotes);
     closeNotesBtn.addEventListener('click', () => notesModal.classList.remove('show'));
 
-    // Fullscreen toggle
     function toggleFullscreen() {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});

@@ -117,75 +117,137 @@ def extracted_invoice_pages(
 
 
 # -------------------------------------------------------------
-# ASSET 3: Phân loại & Cấu trúc hóa hóa đơn (Categorized Invoices)
+# -------------------------------------------------------------
+# 4 ASSET RẼ NHÁNH XỬ LÝ CHUYÊN BIỆT (XÓA BỎ HOÀN TOÀN IF/ELSE)
+# Hiển thị 4 nhánh song song trên Dagster Asset Graph
+# -------------------------------------------------------------
+@asset(group_name="invoice_pipeline")
+def vat_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
+    """Tài sản dữ liệu: Danh sách hóa đơn Giá trị gia tăng (VAT) bóc tách chuyên biệt."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "HOA_DON_VAT"]
+    results = [
+        {
+            "page_num": p["page_num"],
+            "category": "HOA_DON_VAT",
+            "tax_code": "0101234567",
+            "subtotal": 50000000,
+            "vat_amount": 5000000,
+            "total_amount": 55000000,
+            "is_deductible": True,
+        }
+        for p in pages
+    ]
+    return Output(
+        results,
+        metadata={
+            "count": len(results),
+            "tax_code": "0101234567",
+            "vat_amount_vnd": MetadataValue.int(sum(r["vat_amount"] for r in results)),
+        },
+    )
+
+
+@asset(group_name="invoice_pipeline")
+def utility_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
+    """Tài sản dữ liệu: Danh sách hóa đơn Tiền điện / Nước (EVN) bóc tách chuyên biệt."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "HOA_DON_TIEN_ICH"]
+    results = [
+        {
+            "page_num": p["page_num"],
+            "category": "HOA_DON_TIEN_ICH",
+            "customer_code": "PE0100098765",
+            "service_provider": "EVN",
+            "billing_period": "03/2026",
+            "total_amount": 1850000,
+            "is_deductible": True,
+        }
+        for p in pages
+    ]
+    return Output(
+        results,
+        metadata={
+            "count": len(results),
+            "customer_code": "PE0100098765",
+            "total_utility_cost_vnd": MetadataValue.int(sum(r["total_amount"] for r in results)),
+        },
+    )
+
+
+@asset(group_name="invoice_pipeline")
+def reimbursement_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
+    """Tài sản dữ liệu: Danh sách hóa đơn Công tác phí / Vé máy bay bóc tách chuyên biệt."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "HOA_DON_CONG_TAC_PHI"]
+    results = [
+        {
+            "page_num": p["page_num"],
+            "category": "HOA_DON_CONG_TAC_PHI",
+            "employee_id": "NV-889",
+            "employee_name": "Nguyễn Văn A",
+            "route": "Hà Nội - TP.HCM",
+            "total_amount": 3200000,
+            "is_deductible": True,
+        }
+        for p in pages
+    ]
+    return Output(
+        results,
+        metadata={
+            "count": len(results),
+            "employee_id": "NV-889",
+            "total_reimbursement_vnd": MetadataValue.int(sum(r["total_amount"] for r in results)),
+        },
+    )
+
+
+@asset(group_name="invoice_pipeline")
+def invalid_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
+    """Tài sản dữ liệu: Danh sách biên lai bán lẻ / hóa đơn không hợp lệ."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "BIEN_LAI_KHONG_HOP_LE"]
+    results = [
+        {
+            "page_num": p["page_num"],
+            "category": "BIEN_LAI_KHONG_HOP_LE",
+            "total_amount": 150000,
+            "is_deductible": False,
+            "alert": "KHÔNG ĐƯỢC KHẤU TRỪ THUẾ TNDN",
+        }
+        for p in pages
+    ]
+    return Output(
+        results,
+        metadata={
+            "count": len(results),
+            "alert": "KHÔNG ĐƯỢC KHẤU TRỪ THUẾ TNDN",
+            "total_invalid_vnd": MetadataValue.int(sum(r["total_amount"] for r in results)),
+        },
+    )
+
+
+# -------------------------------------------------------------
+# ASSET GOM KẾT QUẢ (FAN-IN TỰ ĐỘNG - KHÔNG CẦN IF/ELSE)
 # -------------------------------------------------------------
 @asset(group_name="invoice_pipeline")
 def categorized_invoices(
-    extracted_invoice_pages: List[Dict[str, Any]]
+    vat_invoices: List[Dict[str, Any]],
+    utility_invoices: List[Dict[str, Any]],
+    reimbursement_invoices: List[Dict[str, Any]],
+    invalid_invoices: List[Dict[str, Any]],
 ) -> Output[List[Dict[str, Any]]]:
     """
-    Tài sản dữ liệu: Danh sách các hóa đơn đã bóc tách chi tiết theo Schema:
-    - VAT: tax_code, subtotal, vat_amount, total_amount, is_deductible
-    - Tiện ích: customer_code, billing_period, total_amount
-    - Công tác phí: employee_id, employee_name, total_amount
-    - Biên lai: total_amount, is_deductible = False
+    Tài sản dữ liệu: Tập hợp tất cả các hóa đơn đã bóc tách từ 4 nhánh chuyên biệt.
+    Không có bất kỳ if/else nào, Dagster tự động kết nối và gom 4 nhánh về đây!
     """
-    structured_records = []
-    for page in extracted_invoice_pages:
-        cat = page["category"]
-        p_num = page["page_num"]
-
-        if cat == "HOA_DON_VAT":
-            details = {
-                "page_num": p_num,
-                "category": cat,
-                "tax_code": "0101234567",
-                "subtotal": 50000000,
-                "vat_amount": 5000000,
-                "total_amount": 55000000,
-                "is_deductible": True,
-            }
-        elif cat == "HOA_DON_TIEN_ICH":
-            details = {
-                "page_num": p_num,
-                "category": cat,
-                "customer_code": "PE0100098765",
-                "service_provider": "EVN",
-                "billing_period": "03/2026",
-                "total_amount": 1850000,
-                "is_deductible": True,
-            }
-        elif cat == "HOA_DON_CONG_TAC_PHI":
-            details = {
-                "page_num": p_num,
-                "category": cat,
-                "employee_id": "NV-889",
-                "employee_name": "Nguyễn Văn A",
-                "route": "Hà Nội - TP.HCM",
-                "total_amount": 3200000,
-                "is_deductible": True,
-            }
-        else:
-            details = {
-                "page_num": p_num,
-                "category": cat,
-                "total_amount": 150000,
-                "is_deductible": False,
-                "alert": "KHÔNG ĐƯỢC KHẤU TRỪ THUẾ TNDN",
-            }
-
-        structured_records.append(details)
-
-    total_cost = sum(r["total_amount"] for r in structured_records)
-    total_vat = sum(r.get("vat_amount", 0) for r in structured_records)
+    all_records = vat_invoices + utility_invoices + reimbursement_invoices + invalid_invoices
+    total_cost = sum(r["total_amount"] for r in all_records)
+    total_vat = sum(r.get("vat_amount", 0) for r in all_records)
 
     return Output(
-        structured_records,
+        all_records,
         metadata={
-            "total_invoices": len(structured_records),
+            "total_invoices": len(all_records),
             "calculated_total_cost_vnd": MetadataValue.int(total_cost),
             "calculated_vat_deductible_vnd": MetadataValue.int(total_vat),
-            "preview_vat_invoice": MetadataValue.json(structured_records[0]),
+            "preview_vat_invoice": MetadataValue.json(all_records[0] if all_records else {}),
         },
     )
 
