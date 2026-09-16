@@ -1,0 +1,7 @@
+[32m2026-09-14 18:53:57 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - b2fe4aa9-9bc0-4145-a926-3d5b869b0351 - 405047 - LOGS_CAPTURED - Capturing logs for process (pid: 405047).
+[32m2026-09-14 18:53:57 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - b2fe4aa9-9bc0-4145-a926-3d5b869b0351 - 405047 - raw_pdf_batch - STEP_START - Started execution of step "raw_pdf_batch".
+[32m2026-09-14 18:53:57 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - b2fe4aa9-9bc0-4145-a926-3d5b869b0351 - 405047 - raw_pdf_batch - STEP_OUTPUT - Yielded output "result" of type "[Dict[String,Any]]". (Type check passed).
+[32m2026-09-14 18:53:57 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - b2fe4aa9-9bc0-4145-a926-3d5b869b0351 - raw_pdf_batch - Writing file at: /home/duc/SelftTraining/Airflow_Dagster/dagster_demo/.tmp_dagster_home_rokhdyfi/storage/raw_pdf_batch using PickledObjectFilesystemIOManager...
+[32m2026-09-14 18:53:57 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - b2fe4aa9-9bc0-4145-a926-3d5b869b0351 - 405047 - raw_pdf_batch - ASSET_MATERIALIZATION - Materialized value raw_pdf_batch.
+[32m2026-09-14 18:53:57 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - b2fe4aa9-9bc0-4145-a926-3d5b869b0351 - 405047 - raw_pdf_batch - HANDLED_OUTPUT - Handled output "result" using IO manager "io_manager"
+[32m2026-09-14 18:53:57 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - b2fe4aa9-9bc0-4145-a926-3d5b869b0351 - 405047 - raw_pdf_batch - STEP_SUCCESS - Finished execution of step "raw_pdf_batch" in 103ms.

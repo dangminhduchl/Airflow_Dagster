@@ -478,10 +478,10 @@
     <section id="tab-code-ui" class="tab-content active">
       <div class="sub-switch">
         <button class="sub-btn active-af" id="btn-show-af" onclick="switchFrameworkView('af')">
-          🌪️ Xem Apache Airflow (order_processing_dag.py)
+          🌪️ Xem Apache Airflow (invoice_multipage_pdf_dag.py)
         </button>
         <button class="sub-btn" id="btn-show-dag" onclick="switchFrameworkView('dag')">
-          ⚡ Xem Dagster (assets_workflow.py)
+          ⚡ Xem Dagster (assets.py)
         </button>
       </div>
 
@@ -490,45 +490,46 @@
         <!-- Editor Column -->
         <div class="editor-pane">
           <div class="pane-header">
-            <span>📄 order_processing_dag.py (Di chuột vào từng dòng để xem vị trí trên Web UI)</span>
+            <span>📄 invoice_multipage_pdf_dag.py (Hover vào từng khối code để định vị trên UI)</span>
             <span style="color: var(--cyan); font-weight: 600;">Hover để xem UI ➔</span>
           </div>
           <div class="code-lines">
             <div class="code-row" onmouseenter="highlightAf('dag-header')" onmouseleave="unhighlightAf()">
-              <span style="color: #6b7280;"># 1. Định nghĩa DAG</span><br>
+              <span style="color: #6b7280;"># 1. Định nghĩa DAG & Tags</span><br>
               <span style="color: #c084fc;">@dag</span>(<br>
-              &nbsp;&nbsp;dag_id=<span style="color: #a5f3fc;">"order_processing_airflow_dag"</span>,<br>
-              &nbsp;&nbsp;tags=[<span style="color: #86efac;">"migration"</span>, <span style="color: #86efac;">"demo"</span>],<br>
-              &nbsp;&nbsp;doc_md=__doc__<br>
+              &nbsp;&nbsp;dag_id=<span style="color: #a5f3fc;">"invoice_multipage_pdf_airflow_dag"</span>,<br>
+              &nbsp;&nbsp;tags=[<span style="color: #86efac;">"invoice"</span>, <span style="color: #86efac;">"parallel_routing"</span>, <span style="color: #86efac;">"flagship"</span>]<br>
               )
             </div>
             <br>
-            <div class="code-row" onmouseenter="highlightAf('task-fetch')" onmouseleave="unhighlightAf()">
-              <span style="color: #6b7280;"># 2. Task 1: Lấy dữ liệu lô đơn hàng</span><br>
+            <div class="code-row" onmouseenter="highlightAf('task-ingest')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 2. Task 1: Nạp file PDF 4 trang</span><br>
               <span style="color: #c084fc;">@task</span><br>
-              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">fetch_orders_batch</span>():<br>
-              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> {<span style="color: #a5f3fc;">"orders"</span>: [...]}
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">ingest_multipage_invoice_pdf</span>():<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> {<span style="color: #a5f3fc;">"pdf_filename"</span>: <span style="color: #a5f3fc;">"chung_tu_dau_vao_thang_3.pdf"</span>, <span style="color: #a5f3fc;">"total_pages"</span>: 4}
             </div>
             <br>
-            <div class="code-row" onmouseenter="highlightAf('task-branch')" onmouseleave="unhighlightAf()">
-              <span style="color: #6b7280;"># 3. Choice State: Rẽ nhánh</span><br>
+            <div class="code-row" onmouseenter="highlightAf('task-branch-pdf')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 3. Check 1 (@task.branch): Kiểm tra file PDF</span><br>
               <span style="color: #c084fc;">@task.branch</span><br>
-              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">check_batch_condition</span>(batch_info):<br>
-              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> <span style="color: #a5f3fc;">"prepare_orders_for_mapping"</span>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">check_pdf_integrity</span>(pdf_data):<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> <span style="color: #a5f3fc;">"classify_invoice_pages"</span> <span style="color: #f43f5e;">if</span> valid <span style="color: #f43f5e;">else</span> <span style="color: #a5f3fc;">"handle_corrupted_pdf_file"</span>
             </div>
             <br>
-            <div class="code-row" onmouseenter="highlightAf('task-expand')" onmouseleave="unhighlightAf()">
-              <span style="color: #6b7280;"># 4. Map State: Lặp song song từng đơn hàng</span><br>
-              <span style="color: #c084fc;">@task</span><br>
-              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">process_single_order</span>(order):<br>
-              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> {<span style="color: #a5f3fc;">"final_price"</span>: order[<span style="color: #a5f3fc;">"amount"</span>] * 0.9}
+            <div class="code-row" onmouseenter="highlightAf('task-expand-branches')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 4. 4 Nhánh song song bằng Dynamic Task Mapping (.expand)</span><br>
+              vat_mapped = extract_vat_invoice.<span style="color: #38bdf8;">expand</span>(page=vat_pages)<br>
+              utility_mapped = extract_utility_invoice.<span style="color: #38bdf8;">expand</span>(page=utility_pages)<br>
+              reimburse_mapped = extract_reimbursement_invoice.<span style="color: #38bdf8;">expand</span>(...)<br>
+              invalid_mapped = extract_invalid_invoice.<span style="color: #38bdf8;">expand</span>(...)
             </div>
             <br>
-            <div class="code-row" onmouseenter="highlightAf('task-wiring')" onmouseleave="unhighlightAf()">
-              <span style="color: #6b7280;"># 5. Nối dây bằng >> và .expand()</span><br>
-              mapped_orders = process_single_order.<span style="color: #38bdf8;">expand</span>(order=orders_list)<br>
-              summary_result = aggregate_results(mapped_orders)<br>
-              summary_result <span style="color: #f43f5e;">&gt;&gt;</span> finish
+            <div class="code-row" onmouseenter="highlightAf('task-collect-audit')" onmouseleave="unhighlightAf()">
+              <span style="color: #6b7280;"># 5. Gom kết quả an toàn & Check 2, 3 (Kiểm định tài chính)</span><br>
+              <span style="color: #c084fc;">@task</span>(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)<br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">collect_extracted_invoices</span>(...): ...<br>
+              <span style="color: #c084fc;">@task.branch</span><br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">audit_financial_budget_compliance</span>(invoices): ...
             </div>
           </div>
         </div>
@@ -539,58 +540,72 @@
             <div class="dot red"></div>
             <div class="dot yellow"></div>
             <div class="dot green"></div>
-            <div class="browser-url">http://localhost:8080/dags/order_processing_airflow_dag/graph</div>
+            <div class="browser-url">http://localhost:8080/dags/invoice_multipage_pdf_airflow_dag/graph</div>
           </div>
           <div class="ui-canvas">
             <!-- 1. Header Card -->
             <div id="sim-af-dag-header" class="sim-card">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-size: 18px; font-weight: 800; color: #fff;">
-                  order_processing_airflow_dag
+                <div style="font-size: 17px; font-weight: 800; color: #fff;">
+                  invoice_multipage_pdf_airflow_dag
                 </div>
                 <div style="display: flex; gap: 6px;">
-                  <span style="background: #1e293b; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">migration</span>
-                  <span style="background: #1e293b; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">demo</span>
+                  <span style="background: #1e293b; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">invoice</span>
+                  <span style="background: #1e293b; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">flagship</span>
                 </div>
               </div>
               <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
-                Schedule: None | Status: Active | Owner: airflow
+                Schedule: None | Status: Active | Run State: Success
               </p>
             </div>
 
             <!-- 2. Graph Canvas -->
-            <div style="background: #0a0f1d; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
-              <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 14px;">GRAPH VIEW (Mỗi task là 1 ô hình chữ nhật):</div>
-              <div style="display: flex; flex-direction: column; gap: 14px; align-items: center;">
+            <div style="background: #0a0f1d; border: 1px solid var(--border-color); border-radius: 12px; padding: 18px;">
+              <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 12px;">GRAPH VIEW (Airflow Task DAG):</div>
+              <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
                 
                 <!-- Node 1 -->
-                <div id="sim-af-task-fetch" class="g-node">
-                  <span style="color: #cbd5e1; font-weight: 600;">fetch_orders_batch</span>
+                <div id="sim-af-task-ingest" class="g-node">
+                  <span style="color: #cbd5e1; font-weight: 600;">ingest_multipage_invoice_pdf</span>
                   <span style="font-size: 10px; color: var(--green);">● success</span>
                 </div>
                 <div class="arrow-right">▼</div>
 
                 <!-- Node 2 -->
-                <div id="sim-af-task-branch" class="g-node">
-                  <span style="color: #cbd5e1; font-weight: 600;">check_batch_condition</span>
-                  <span style="font-size: 10px; color: var(--amber);">🔀 Branching Task</span>
+                <div id="sim-af-task-branch-pdf" class="g-node">
+                  <span style="color: #cbd5e1; font-weight: 600;">check_pdf_integrity</span>
+                  <span style="font-size: 10px; color: var(--amber);">🔀 File Check Branch</span>
                 </div>
                 <div class="arrow-right">▼</div>
 
-                <!-- Node 3: Expand Map -->
-                <div id="sim-af-task-expand" class="g-node">
-                  <div style="display: flex; justify-content: space-between; width: 100%;">
-                    <span style="color: #cbd5e1; font-weight: 600;">process_single_order</span>
-                    <span style="background: #0284c7; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: bold;">[4]</span>
+                <!-- Node 3: Parallel 4 Boxes -->
+                <div id="sim-af-task-expand-branches" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+                  <div class="g-node" style="padding: 6px 10px; border-color: rgba(6, 182, 212, 0.4);">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--cyan);">extract_vat [1]</span>
+                    <span style="font-size: 9.5px; color: var(--green);">● 55.000.000đ</span>
                   </div>
-                  <span style="font-size: 10px; color: #38bdf8;">Dynamic Task Mapping (.expand)</span>
+                  <div class="g-node" style="padding: 6px 10px; border-color: rgba(245, 158, 11, 0.4);">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--amber);">extract_utility [1]</span>
+                    <span style="font-size: 9.5px; color: var(--green);">● 1.850.000đ</span>
+                  </div>
+                  <div class="g-node" style="padding: 6px 10px; border-color: rgba(168, 85, 247, 0.4);">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--purple);">extract_reimburse [1]</span>
+                    <span style="font-size: 9.5px; color: var(--green);">● 3.200.000đ</span>
+                  </div>
+                  <div class="g-node" style="padding: 6px 10px; border-color: rgba(244, 63, 94, 0.4);">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--rose);">extract_invalid [1]</span>
+                    <span style="font-size: 9.5px; color: var(--amber);">⚠ 150.000đ</span>
+                  </div>
                 </div>
                 <div class="arrow-right">▼</div>
 
-                <!-- Node 4: Finish -->
-                <div id="sim-af-task-wiring" class="g-node" style="min-width: 100px;">
-                  <span style="color: #cbd5e1; font-weight: 600;">finish</span>
-                  <span style="font-size: 10px; color: var(--text-muted);">EmptyOperator</span>
+                <!-- Node 4: Collect & Audit -->
+                <div id="sim-af-task-collect-audit" class="g-node" style="border-color: rgba(16, 185, 129, 0.5);">
+                  <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <span style="color: #cbd5e1; font-weight: 600;">lock_and_publish_financial_ledger</span>
+                    <span style="font-size: 10px; color: var(--green);">● LOCKED</span>
+                  </div>
+                  <span style="font-size: 10px; color: var(--text-muted);">Sổ cái: 60.200.000đ (VAT: 5.000.000đ)</span>
                 </div>
 
               </div>
@@ -609,32 +624,30 @@
         <!-- Editor Column -->
         <div class="editor-pane">
           <div class="pane-header">
-            <span>📄 assets_workflow.py (Di chuột vào từng dòng code Dagster)</span>
+            <span>📄 dagster_demo/invoice_processing/assets.py</span>
             <span style="color: var(--purple); font-weight: 600;">Hover để xem UI ➔</span>
           </div>
           <div class="code-lines">
             <div class="code-row dag-hl" onmouseenter="highlightDag('dag-group')" onmouseleave="unhighlightDag()">
-              <span style="color: #6b7280;"># 1. Gom nhóm Assets thành 1 khung viền</span><br>
-              <span style="color: #c084fc;">@asset</span>(group_name=<span style="color: #a5f3fc;">"orders_pipeline"</span>)<br>
-              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">raw_orders_batch</span>():<br>
-              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> [...]
+              <span style="color: #6b7280;"># 1. Gom nhóm Assets: group_name="invoice_pipeline"</span><br>
+              <span style="color: #c084fc;">@asset</span>(group_name=<span style="color: #a5f3fc;">"invoice_pipeline"</span>)<br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">raw_multipage_invoice_pdf</span>():<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> {<span style="color: #a5f3fc;">"pdf_filename"</span>: <span style="color: #a5f3fc;">"chung_tu_dau_vao_thang_3.pdf"</span>, <span style="color: #a5f3fc;">"total_pages"</span>: 4}
+            </div>
+            <br>
+            <div class="code-row dag-hl" onmouseenter="highlightDag('dag-checks')" onmouseleave="unhighlightDag()">
+              <span style="color: #6b7280;"># 2. First-class @asset_check: Kiểm định chất lượng</span><br>
+              <span style="color: #c084fc;">@asset_check</span>(asset=raw_multipage_invoice_pdf)<br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">check_pdf_file_integrity</span>(...): ...<br>
+              <span style="color: #c084fc;">@asset_check</span>(asset=categorized_invoices, <span style="color: #f43f5e; font-weight: bold;">blocking=True</span>)<br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">check_budget_limit_compliance</span>(...): ...
             </div>
             <br>
             <div class="code-row dag-hl" onmouseenter="highlightDag('dag-dep')" onmouseleave="unhighlightDag()">
-              <span style="color: #6b7280;"># 2. Nối dây tự động: Tên tham số = Tên Asset trước!</span><br>
-              <span style="color: #c084fc;">@asset</span>(group_name=<span style="color: #a5f3fc;">"orders_pipeline"</span>)<br>
-              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">validated_orders</span>(<span style="color: #f43f5e; font-weight: bold;">raw_orders_batch</span>):<br>
-              &nbsp;&nbsp;cleaned = [apply_discount(o) <span style="color: #f43f5e;">for</span> o <span style="color: #f43f5e;">in</span> raw_orders_batch]<br>
-            </div>
-            <br>
-            <div class="code-row dag-hl" onmouseenter="highlightDag('dag-metadata')" onmouseleave="unhighlightDag()">
-              <span style="color: #6b7280;"># 3. Ghi chỉ số Metadata trực quan lên Web UI</span><br>
-              &nbsp;&nbsp;metadata = {<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #a5f3fc;">"total_records"</span>: len(cleaned),<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #a5f3fc;">"vip_records"</span>: sum(1 <span style="color: #f43f5e;">for</span> o <span style="color: #f43f5e;">in</span> cleaned <span style="color: #f43f5e;">if</span> o[<span style="color: #a5f3fc;">"tier"</span>]==<span style="color: #a5f3fc;">"VIP"</span>),<br>
-              &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #a5f3fc;">"preview"</span>: MetadataValue.json(cleaned[:2])<br>
-              &nbsp;&nbsp;}<br>
-              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> Output(cleaned, metadata=metadata)
+              <span style="color: #6b7280;"># 3. Tự động gom 4 nhánh song song: Không cần if/else!</span><br>
+              <span style="color: #c084fc;">@asset</span>(group_name=<span style="color: #a5f3fc;">"invoice_pipeline"</span>)<br>
+              <span style="color: #60a5fa;">def</span> <span style="color: #fde047;">categorized_invoices</span>(<span style="color: #a5f3fc;">vat_invoices</span>, <span style="color: #a5f3fc;">utility_invoices</span>, <span style="color: #a5f3fc;">reimbursement_invoices</span>, <span style="color: #a5f3fc;">invalid_invoices</span>):<br>
+              &nbsp;&nbsp;<span style="color: #f43f5e;">return</span> Output(all_records, metadata={<span style="color: #a5f3fc;">"total_expense"</span>: 60200000})
             </div>
           </div>
         </div>
@@ -645,51 +658,68 @@
             <div class="dot red"></div>
             <div class="dot yellow"></div>
             <div class="dot green"></div>
-            <div class="browser-url">http://localhost:3000/assets?group=orders_pipeline</div>
+            <div class="browser-url">http://localhost:3000/assets?group=invoice_pipeline</div>
           </div>
           <div class="ui-canvas">
             <!-- Group Box -->
-            <div id="sim-dag-group" class="sim-card" style="border: 2px dashed rgba(168, 85, 247, 0.4); padding: 18px;">
-              <div style="font-size: 13px; font-weight: 800; color: var(--purple); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                📦 GROUP: orders_pipeline
+            <div id="sim-dag-group" class="sim-card" style="border: 2px dashed rgba(168, 85, 247, 0.4); padding: 16px;">
+              <div style="font-size: 13px; font-weight: 800; color: var(--purple); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                <span>📦 GROUP: invoice_pipeline</span>
+                <span style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: var(--green); padding: 2px 8px; border-radius: 4px;">Materialized All</span>
               </div>
 
               <!-- Lineage Graph -->
-              <div style="display: flex; align-items: center; justify-content: space-around; gap: 10px;">
-                <div id="sim-dag-node-raw" class="g-node" style="border-radius: 8px;">
-                  <span style="font-size: 11px; color: var(--purple);">ASSET</span>
-                  <span style="font-weight: 700;">raw_orders_batch</span>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-around;">
+                  <div id="sim-dag-node-raw" class="g-node" style="border-radius: 8px; padding: 6px 12px;">
+                    <span style="font-size: 10px; color: var(--purple);">ASSET</span>
+                    <span style="font-weight: 700; font-size: 12px;">raw_multipage_pdf</span>
+                  </div>
+                  <div class="arrow-right" style="color: var(--purple);">➔</div>
+                  <div id="sim-dag-node-val" class="g-node" style="border-radius: 8px; padding: 6px 12px;">
+                    <span style="font-size: 10px; color: var(--purple);">ASSET</span>
+                    <span style="font-weight: 700; font-size: 12px;">extracted_pages</span>
+                  </div>
                 </div>
-                <div class="arrow-right" style="color: var(--purple);">➔</div>
-                <div id="sim-dag-node-val" class="g-node" style="border-radius: 8px;">
-                  <span style="font-size: 11px; color: var(--purple);">ASSET</span>
-                  <span style="font-weight: 700;">validated_orders</span>
+
+                <!-- 4 Parallel Asset Nodes -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                  <div class="g-node" style="padding: 4px 6px; font-size: 10.5px; border-color: rgba(6,182,212,0.4); text-align: center;">vat_invoices</div>
+                  <div class="g-node" style="padding: 4px 6px; font-size: 10.5px; border-color: rgba(245,158,11,0.4); text-align: center;">utility_invoices</div>
+                  <div class="g-node" style="padding: 4px 6px; font-size: 10.5px; border-color: rgba(168,85,247,0.4); text-align: center;">reimburse_inv</div>
+                  <div class="g-node" style="padding: 4px 6px; font-size: 10.5px; border-color: rgba(244,63,94,0.4); text-align: center;">invalid_invoices</div>
                 </div>
-                <div class="arrow-right" style="color: var(--purple);">➔</div>
-                <div class="g-node" style="border-radius: 8px;">
-                  <span style="font-size: 11px; color: var(--purple);">ASSET</span>
-                  <span style="font-weight: 700;">batch_summary_...</span>
+
+                <!-- Downstream Final Ledger -->
+                <div id="sim-dag-node-ledger" class="g-node" style="border-radius: 8px; border-color: var(--green); padding: 8px 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <span style="font-size: 10px; color: var(--green);">DOWNSTREAM ASSET</span><br>
+                      <span style="font-weight: 700; font-size: 12.5px;">monthly_financial_expense_ledger</span>
+                    </div>
+                    <span style="background: rgba(16, 185, 129, 0.2); color: var(--green); font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold;">PASS 100%</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- Metadata Sidebar Mockup -->
-            <div id="sim-dag-sidebar" class="sim-card" style="background: rgba(30, 41, 59, 0.7);">
-              <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 8px;">
-                📋 ASSET METADATA (validated_orders)
+            <div id="sim-dag-sidebar" class="sim-card" style="background: rgba(30, 41, 59, 0.7); margin-top: 10px;">
+              <div style="font-size: 13.5px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+                📋 ASSET METADATA & 3 ASSET CHECKS
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
-                <div style="background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">
-                  <span style="color: var(--text-muted);">total_records:</span>
-                  <span style="font-weight: bold; color: var(--cyan); float: right;">4</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12.5px;">
+                <div style="background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 6px;">
+                  <span style="color: var(--text-muted);">Tổng Chi Phí:</span>
+                  <span style="font-weight: bold; color: var(--cyan); float: right;">60.200.000 VNĐ</span>
                 </div>
-                <div style="background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">
-                  <span style="color: var(--text-muted);">vip_records:</span>
-                  <span style="font-weight: bold; color: var(--purple); float: right;">2</span>
+                <div style="background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 6px;">
+                  <span style="color: var(--text-muted);">VAT Khấu Trừ:</span>
+                  <span style="font-weight: bold; color: var(--green); float: right;">5.000.000 VNĐ</span>
                 </div>
               </div>
-              <div style="margin-top: 10px; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; color: #a5f3fc;">
-                preview: [{"order_id": "ORD-101", "tier": "VIP"}, {"order_id": "ORD-102", "tier": "STD"}]
+              <div style="margin-top: 8px; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; font-size: 11px; color: #86efac;">
+                🛡️ check_budget_limit_compliance (blocking=True): <strong>PASS</strong> (60.2M &le; 100M VND)
               </div>
             </div>
 
@@ -708,17 +738,17 @@
         <div class="flow-column" style="border-top: 4px solid var(--cyan);">
           <h3 style="font-size: 18px; color: var(--cyan);">🌪️ Cách Airflow Nối Các Task</h3>
           <p style="font-size: 14px; color: #cbd5e1;">
-            Trong code của bạn: <code>branch_choice >> skipped_result >> finish</code>
+            Trong code của bạn: <code>file_branch >> classified_groups >> 4 mapped tasks >> collect >> audit >> ledger</code>
           </p>
           <div style="background: #0d1117; padding: 18px; border-radius: 12px; font-family: var(--font-mono); font-size: 13px; line-height: 1.6;">
-            1. Dùng toán tử <span style="color: #f43f5e; font-weight: bold;">&gt;&gt;</span> (Bitwise Shift) để khai báo thứ tự trước sau.<br><br>
-            2. <strong>Luân chuyển dữ liệu:</strong> Task 1 <code>return</code> cái gì thì bị Worker chạy lệnh SQL:<br>
-            <span style="color: #a5f3fc;">INSERT INTO xcom (val) VALUES ('{"orders": ...}')</span><br>
-            nhét vào Database PostgreSQL.<br><br>
-            3. Task 2 muốn nhận dữ liệu phải gọi ngầm <code>ti.xcom_pull()</code> để kéo từ Database ra!
+            1. Dùng toán tử <span style="color: #f43f5e; font-weight: bold;">&gt;&gt;</span> (Bitwise Shift) để khai báo thứ tự task.<br><br>
+            2. <strong>Luân chuyển dữ liệu:</strong> Task bóc tách <code>return</code> cái gì thì Worker chạy lệnh SQL:<br>
+            <span style="color: #a5f3fc;">INSERT INTO xcom (val) VALUES ('{"tax_code": "0101234567", ...}')</span><br>
+            nhét vào Metadata Database PostgreSQL.<br><br>
+            3. Task gom kết quả phải gọi ngầm <code>ti.xcom_pull()</code> và cấu hình <code>TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS</code>!
           </div>
           <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid var(--amber); padding: 12px; border-radius: 8px; font-size: 13px; color: #fde68a;">
-            ⚠️ <strong>Hạn chế:</strong> Nối dây là "mù dữ liệu". Airflow chỉ biết Task B chạy sau Task A, chứ không kiểm tra xem Task A có trả về đúng kiểu dữ liệu Task B cần hay không.
+            ⚠️ <strong>Hạn chế:</strong> Nối dây là "mù dữ liệu". Nếu payload PDF hoặc OCR vượt vài megabyte, Postgres DB của Airflow sẽ bị nghẽn (bottleneck).
           </div>
         </div>
 
@@ -726,15 +756,15 @@
         <div class="flow-column" style="border-top: 4px solid var(--purple);">
           <h3 style="font-size: 18px; color: var(--purple);">⚡ Cách Dagster Nối Các Asset</h3>
           <p style="font-size: 14px; color: #cbd5e1;">
-            Trong code của bạn: <code>def validated_orders(raw_orders_batch):</code>
+            Trong code của bạn: <code>def categorized_invoices(vat_invoices, utility_invoices, ...)</code>
           </p>
           <div style="background: #0d1117; padding: 18px; border-radius: 12px; font-family: var(--font-mono); font-size: 13px; line-height: 1.6;">
             1. <strong>HOÀN TOÀN KHÔNG DÙNG TOÁN TỬ &gt;&gt;</strong>.<br><br>
-            2. Dagster đọc tên tham số: Thấy hàm <code>validated_orders</code> có đối số <code>raw_orders_batch</code> trùng với tên Asset 1.<br><br>
-            3. <strong>Luân chuyển dữ liệu:</strong> <code>IOManager</code> tự động cất đối tượng vào MinIO/Disk. Đến lượt Asset 2, IOManager tự nạp file vào tham số hàm!
+            2. Dagster đọc tên tham số: Thấy hàm <code>categorized_invoices</code> có các tham số trùng tên 4 Asset trước ➔ Tự động vẽ nhánh song song hội tụ!<br><br>
+            3. <strong>Luân chuyển dữ liệu:</strong> <code>IOManager</code> tự động lưu DataFrame/dict ra MinIO hoặc đĩa cứng, hoàn toàn không chạm vào Postgres DB!
           </div>
           <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--green); padding: 12px; border-radius: 8px; font-size: 13px; color: #a7f3d0;">
-            🌟 <strong>Ưu thế vượt trội:</strong> Type-safe 100%! Đồ thị phụ thuộc dữ liệu (Data Lineage) sinh ra tự nhiên, chuẩn Software Engineering.
+            🌟 <strong>Ưu thế vượt trội:</strong> Type-safe 100%! Đồ thị phụ thuộc dữ liệu (Data Lineage) sinh ra tự nhiên, đi kèm 3 chốt chặn <code>@asset_check</code> hạng nhất.
           </div>
         </div>
       </div>
@@ -839,11 +869,11 @@
 
     // Airflow Highlight Interactivity
     const afTooltips = {
-      'dag-header': '<strong>Dòng @dag(dag_id="..."):</strong> Tạo ra tiêu đề lớn của DAG và các Tag nhãn [migration], [demo] trên thanh điều hướng Airflow Web UI.',
-      'task-fetch': '<strong>Hàm @task def fetch_orders_batch():</strong> Tên hàm biến thành hộp chữ nhật đầu tiên mang tên "fetch_orders_batch" trên Graph View.',
-      'task-branch': '<strong>Hàm @task.branch def check_batch_condition():</strong> Biến thành node rẽ nhánh. Khi chạy, nó trả về tên task nào thì Airflow kích hoạt task đó, bỏ qua nhánh còn lại.',
-      'task-expand': '<strong>Hàm @task def process_single_order():</strong> Vì dùng .expand(), trên UI góc của ô này có ký hiệu [4], biểu thị vòng lặp 4 task con song song!',
-      'task-wiring': '<strong>Toán tử >> và .expand():</strong> Đây là code vẽ mũi tên nối các ô lại với nhau trên màn hình Graph View.'
+      'dag-header': '<strong>Dòng @dag(dag_id="invoice_multipage_pdf_airflow_dag"):</strong> Khởi tạo DAG và gắn các thẻ Tag [invoice], [flagship] trên giao diện Airflow Web UI.',
+      'task-ingest': '<strong>Hàm ingest_multipage_invoice_pdf():</strong> Nạp tệp PDF scan tổng hợp 4 trang đầu vào (chung_tu_dau_vao_thang_3.pdf).',
+      'task-branch-pdf': '<strong>Hàm @task.branch check_pdf_integrity():</strong> Rẽ nhánh kiểm tra file PDF. Nếu file hợp lệ và > 0 trang thì chuyển sang phân loại AI, nếu rỗng/hỏng thì rẽ sang handle_corrupted_pdf_file.',
+      'task-expand-branches': '<strong>Toán tử .expand() chia 4 nhánh:</strong> Sinh ra 4 nhóm Mapped Tasks chạy song song: Hóa đơn VAT (55tr), Điện EVN (1.85tr), Công tác phí (3.2tr) và Biên lai tiếp khách (150k).',
+      'task-collect-audit': '<strong>collect_extracted_invoices & audit:</strong> Gom kết quả bằng TriggerRule an toàn và thực hiện Check 2 (Toán thuế VAT) & Check 3 (Ngân sách <= 100M VND) trước khi chốt Sổ Cái.'
     };
 
     function highlightAf(targetId) {
@@ -860,20 +890,20 @@
 
     // Dagster Highlight Interactivity
     const dagTooltips = {
-      'dag-group': '<strong>group_name="orders_pipeline":</strong> Tự động gom tất cả các Asset cùng nhóm vào một khung chữ nhật nét đứt màu tím trên UI.',
-      'dag-dep': '<strong>def validated_orders(raw_orders_batch):</strong> Tên tham số trùng với tên Asset trước ➔ Dagster TỰ ĐỘNG vẽ mũi tên nối Lineage mà không cần toán tử >>!',
-      'dag-metadata': '<strong>metadata={"total_records": ...}:</strong> Biến thành bảng số liệu và bảng JSON Preview hiển thị trực tiếp ở sidebar bên phải của UI.'
+      'dag-group': '<strong>group_name="invoice_pipeline":</strong> Tự động gom toàn bộ chuỗi 8 Asset xử lý hóa đơn vào một khung viền tím trực quan trên Asset Graph.',
+      'dag-checks': '<strong>@asset_check(blocking=True):</strong> 3 Chốt chặn kiểm định chất lượng: Check 1 (File Integrity), Check 2 (Toán thuế VAT), Check 3 (Chặn đứng vi phạm trần ngân sách 100M VND)!',
+      'dag-dep': '<strong>def categorized_invoices(vat_invoices, utility_invoices, ...):</strong> Dagster tự động kết nối và gom 4 nhánh song song lại mà lập trình viên không cần viết bất kỳ dòng if/else nào!'
     };
 
     function highlightDag(targetId) {
       document.querySelectorAll('.sim-card, .g-node').forEach(el => el.classList.remove('active-target-dag'));
       if (targetId === 'dag-group') {
         document.getElementById('sim-dag-group').classList.add('active-target-dag');
-      } else if (targetId === 'dag-dep') {
-        document.getElementById('sim-dag-node-raw').classList.add('active-target-dag');
-        document.getElementById('sim-dag-node-val').classList.add('active-target-dag');
-      } else if (targetId === 'dag-metadata') {
+      } else if (targetId === 'dag-checks') {
         document.getElementById('sim-dag-sidebar').classList.add('active-target-dag');
+      } else if (targetId === 'dag-dep') {
+        document.getElementById('sim-dag-node-val').classList.add('active-target-dag');
+        document.getElementById('sim-dag-node-ledger').classList.add('active-target-dag');
       }
       document.getElementById('dag-tooltip').innerHTML = dagTooltips[targetId] || '';
     }
@@ -888,23 +918,23 @@
     const simSteps = [
       {
         title: "BƯỚC 1: KÍCH HOẠT JOB (TRIGGER RUN)",
-        af: "Người dùng bấm nút 'Trigger DAG' trên Web UI ➔ Webserver tạo 1 bản ghi vào bảng <code>dag_run</code> trong PostgreSQL (state = 'queued').<br>Scheduler của Airflow quét thấy, gắp Task đầu tiên <code>fetch_orders_batch</code> đẩy vào hàng đợi Redis Queue.",
-        dag: "Người dùng bấm 'Materialize' ➔ Webserver gửi bản tin gRPC sang container <strong>Code Location</strong>.<br>Dagster Daemon tạo bản ghi trong Postgres và gọi K8s Run Launcher để khởi tạo 1 Pod độc lập riêng cho Run này."
+        af: "Người dùng bấm nút 'Trigger DAG' trên Web UI ➔ Webserver tạo 1 bản ghi vào bảng <code>dag_run</code> trong PostgreSQL.<br>Scheduler quét thấy, gắp Task đầu tiên <code>ingest_multipage_invoice_pdf</code> đẩy vào hàng đợi Redis/Celery.",
+        dag: "Người dùng bấm 'Materialize all' ➔ Webserver gửi bản tin gRPC sang container <strong>Code Location</strong>.<br>Dagster Daemon tạo bản ghi trong Postgres và gọi Run Launcher khởi tạo Pod độc lập cho Run này."
       },
       {
-        title: "BƯỚC 2: TASK 1 CHẠY VÀ LƯU DỮ LIỆU",
-        af: "Worker Airflow nhặt task từ Redis, chạy hàm <code>fetch_orders_batch()</code>.<br>Hàm trả về danh sách 4 đơn hàng ➔ Worker tự chạy lệnh SQL: <br><code style='color:#a5f3fc;'>INSERT INTO xcom (val) VALUES ('[Alice, Bob, ...]')</code> nhét thẳng 4 đơn hàng vào bảng <code>xcom</code> trong PostgreSQL!",
-        dag: "Pod chạy hàm <code>raw_orders_batch()</code>.<br>Hàm trả về danh sách 4 đơn hàng ➔ <strong>IOManager</strong> tự động bắt lấy, cất vào MinIO (hoặc đĩa) dạng file parquet.<br>PostgreSQL hoàn toàn sạch sẽ, chỉ nhận đúng 1 dòng sự kiện: <em>'Asset raw_orders_batch materialized'</em>."
+        title: "BƯỚC 2: INGEST VÀ KIỂM TRA FILE INTEGRITY (CHECK 1)",
+        af: "Worker Airflow nạp file PDF 4 trang và serialize đối tượng vào bảng <code>xcom</code> của Postgres.<br>Task <code>check_pdf_integrity</code> rẽ nhánh: File hợp lệ ➔ chuyển sang phân loại 4 nhóm.",
+        dag: "Pod nạp file PDF 4 trang ➔ <strong>IOManager</strong> cất dữ liệu trung gian vào MinIO/Disk.<br>Đồng thời kích hoạt <code>check_pdf_file_integrity</code> (@asset_check): Đạt chuẩn 4 trang, hiển thị badge xanh trên UI."
       },
       {
-        title: "BƯỚC 3: TASK 2 TIẾP NHẬN DỮ LIỆU",
-        af: "Scheduler quét thấy Task 1 xong, gắp tiếp Task 2 đẩy vào Redis.<br>Worker Task 2 muốn có dữ liệu 4 đơn hàng phải chạy câu lệnh: <br><code style='color:#a5f3fc;'>SELECT val FROM xcom WHERE task_id='fetch_orders_batch'</code> để lôi dữ liệu từ PostgreSQL ra giải nén lại!",
-        dag: "Pod chuẩn bị chạy hàm <code>validated_orders(raw_orders_batch)</code>.<br><strong>IOManager</strong> tự động mở file trên MinIO ra, deserialize thành list Python và nạp thẳng vào tham số đầu vào của hàm. Hàm chỉ việc tính toán chiết khấu!"
+        title: "BƯỚC 3: 4 NHÁNH BÓC TÁCH SONG SONG & FAN-IN GOM KẾT QUẢ",
+        af: "4 Task mapped instances (.expand) bóc tách song song: VAT (55tr), Điện EVN (1.85tr), Vé máy bay (3.2tr), Biên lai (150k).<br>Task <code>collect_extracted_invoices</code> dùng <code>TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS</code> để gom kết quả an toàn.",
+        dag: "4 Software-Defined Assets (<code>vat_invoices</code>, <code>utility_invoices</code>, <code>reimbursement_invoices</code>, <code>invalid_invoices</code>) chạy song song đa tiến trình.<br>Asset <code>categorized_invoices</code> tự động gom 4 nhánh qua tham số hàm (Dependency Injection)."
       },
       {
-        title: "BƯỚC 4: KẾT THÚC VÀ HIỂN THỊ KẾT QUẢ",
-        af: "Toàn bộ DAG hoàn thành. Giao diện Grid View chuyển sang màu xanh lá.<br>Nếu muốn xem kết quả đơn hàng, bạn phải vào tab 'XCom' trong Admin để đọc chuỗi JSON trong bảng.",
-        dag: "Asset Graph chuyển sang màu xanh lá. Dữ liệu mới nhất được cập nhật vào Asset Catalog.<br>Bấm vào Asset <code>validated_orders</code>, bạn thấy ngay con số <code>total_records: 4</code>, <code>vip_records: 2</code> và bảng xem trước JSON trực quan!"
+        title: "BƯỚC 4: KIỂM ĐỊNH TÀI CHÍNH & CHỐT SỔ CÁI DOANH NGHIỆP",
+        af: "Task <code>audit_financial_budget_compliance</code> kiểm tra: Chi phí 60.2M <= 100M VND và thuế khớp ➔ Rẽ sang <code>lock_and_publish_financial_ledger</code> chốt sổ ERP.",
+        dag: "Dagster chạy <code>check_budget_limit_compliance</code> (@asset_check, <strong>blocking=True</strong>): Chi phí 60.200.000 VNĐ &le; 100.000.000 VNĐ ➔ Cho phép xuất xưởng Asset <code>monthly_financial_expense_ledger</code>, lưu trực tiếp metadata và khóa sổ!"
       }
     ];
 

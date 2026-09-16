@@ -8,374 +8,321 @@
 ---
 
 ## MỤC LỤC KỊCH BẢN THUYẾT TRÌNH
-
-1. **PHẦN 1: ĐƯA RA BÀI TOÁN NGHIỆP VỤ (THE BUSINESS PROBLEM)**
-   - Bối cảnh: Xử lý tệp PDF chứng từ đầu vào đa trang (`chung_tu_dau_vao_thang_3.pdf`)
-   - 4 Bước quy trình & 4 Phân loại chi phí song song (VAT, Điện EVN, Công tác, Vé không hợp lệ)
-   - 3 Chốt chặn kiểm định dữ liệu (Integrity, VAT Math, Ngân sách 100M VND)
-   - Thách thức khi chuyển dịch từ AWS Step Functions về On-Premise/K8s
-
-2. **PHẦN 2: LIVE DEMO HỆ THỐNG (TWO DIFFERENT WORLDS)**
-   - Demo Airflow UI: Graph View, TaskFlow Branching, Dynamic Task Mapping, 4 nhánh song song
-   - Demo Dagster UI: Asset Lineage Graph, Materialize in-memory, Asset Checks chặn vi phạm
-   - So sánh trực quan trải nghiệm điều hành (Task-Centric vs. Asset-Centric)
-
-3. **PHẦN 3: PHÂN TÍCH CODE AIRFLOW & CẤU TẠO HOẠT ĐỘNG NGẦM (UNDER THE HOOD)**
-   - Mổ xẻ Code `invoice_multipage_pdf_dag.py`: `@dag`, `@task`, `@task.branch`, `.expand()`
-   - Cấu tạo 4 trụ cột hệ thống: Scheduler, Webserver, Metadata Database, Worker/Executor
-   - Vòng lặp quét DAG của Scheduler & Cơ chế luân chuyển XCom
-
-4. **PHẦN 4: TỪ CẤU TẠO ĐẾN HẠN CHẾ CỐT TỬ $\rightarrow$ DAGSTER CÓ GÌ MỚI?**
-   - Hạn chế 1: "Mù dữ liệu" (Data Blindness) $\rightarrow$ **Dagster SDA (Software-Defined Asset)**
-   - Hạn chế 2: Cực hình khi viết Test & Local Debug $\rightarrow$ **Dagster Pure Functions & Pytest 0.05s**
-   - Hạn chế 3: Nghẽn cổ chai XCom qua Database $\rightarrow$ **Dagster I/O Manager cắm rút**
-   - Hạn chế 4: Kiến trúc Monolithic dễ sập cụm $\rightarrow$ **Dagster Daemon & gRPC Out-of-process**
-   - Hạn chế 5: Thiếu Data Quality tích hợp $\rightarrow$ **Dagster `@asset_check` (blocking)**
-
-5. **PHẦN 5: KẾT LUẬN & ĐỀ XUẤT QUYẾT ĐỊNH (TAKEAWAYS & ROADMAP)**
-   - Ma trận chấm điểm kỹ thuật có trọng số
-   - Định vị ứng dụng: Ai phù hợp cho cái gì?
-   - Lộ trình di chuyển 3 giai đoạn lên On-Premise / K8s
-   - Q&A & Kế hoạch hành động
-
----
-
-<!-- ========================================================================= -->
-<!-- PHẦN 1: ĐƯA RA BÀI TOÁN -->
-<!-- ========================================================================= -->
-
-# PHẦN 1: ĐƯA RA BÀI TOÁN NGHIỆP VỤ
+| Slide # | Tiêu Đề Slide | Trọng Tâm Trình Bày |
+| :--- | :--- | :--- |
+| **01** | Trang Tiêu Đề | Giới thiệu chủ đề: Airflow vs. Dagster thực chiến |
+| **02** | AWS Step Function | Bối cảnh hiện trạng & Thách thức khi chuyển đổi |
+| **03** | Bài Toán Tự Động Bóc Tách Hóa Đơn | Nghiệp vụ 4 loại hóa đơn & Luồng kiểm toán tài chính |
+| **04** | Góc Nhìn Airflow & Dagster | Task-Centric vs. Asset-Centric (Sơ đồ đối chiếu) |
+| **05** | 1 Task Trong Airflow | Nút thắt vòng lặp parsing & Cơ chế ép nạp XCom DB |
+| **06** | Trong Dagster | Chu trình phân tách gRPC, lưu trữ I/O & Khiên Asset Checks |
+| **07** | Hạ Tầng On-Premise & Năng Lực CI/CD | Kiến trúc cụm On-Prem (MinIO, K8s) & Kiểm thử in-memory CI/CD 0.12s |
+| **08** | Ma Trận So Sánh Kỹ Thuật Tổng Hợp | Bảng chấm điểm 7 tiêu chí so sánh toàn diện |
+| **09** | Khi Nào Dùng Ai? (Định Vị Doanh Nghiệp) | Cây quyết định lựa chọn công nghệ theo bài toán |
+| **10** | Lộ Trình Triển Khai 3 Giai Đoạn | Kế hoạch chuyển đổi từng bước giảm thiểu rủi ro |
+| **11** | Tổng Kết & Q&A | Đúc kết thông điệp cốt lõi & Giải đáp câu hỏi |
 
 ---
 
 ## SLIDE 1: TRANG TIÊU ĐỀ
-### **SO SÁNH THỰC CHIẾN AIRFLOW VS. DAGSTER**
-#### *Từ Cấu Tạo Cốt Lõi, Điểm Nghẽn Kỹ Thuật Đến Trải Nghiệm Xử Lý Dữ Liệu Hiện Đại*
+### **Apache Airflow & dagster**
+#### *So Sánh Thực Chiến: Từ Cấu Tạo Cốt Lõi Đến Nền Tảng Điều Phối Dữ Liệu Hiện Đại*
 
-* **Diễn giả:** [Họ và Tên] - Solution Architect / Data Platform Lead
-* **Bối cảnh:** Dự án chuyển dịch luồng xử lý tự động từ AWS Step Functions về cụm On-Premise / Kubernetes.
-
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Kính chào anh chị và ban lãnh đạo. Khi đưa các quy trình xử lý dữ liệu và AI từ Cloud về hạ tầng On-Premise, câu hỏi lớn nhất luôn là: 'Chúng ta nên dùng công cụ nào để điều phối?'. 
-> Hôm nay, chúng ta không so sánh lý thuyết chung chung. Chúng ta sẽ lấy một bài toán nghiệp vụ thật 100%: Xử lý tập hóa đơn đa trang và kiểm toán chi phí tài chính, sau đó phân tích sâu từ cấu tạo ngầm, code thực tế, đến lý do vì sao kiến trúc cũ lại gặp điểm nghẽn và giải pháp thế hệ mới giải quyết ra sao."
-
----
-
-## SLIDE 2: BÀI TOÁN THỰC TẾ: XỬ LÝ HÓA ĐƠN PDF ĐA TRANG
-### **Tệp PDF đầu vào: `chung_tu_dau_vao_thang_3.pdf` (4 trang chứng từ hỗn hợp)**
-
-* **Thực tế doanh nghiệp**: Hóa đơn đầu vào quét về không nằm ở từng file riêng lẻ mà gom thành 1 file PDF scan tổng hợp gồm nhiều trang, thuộc nhiều loại chi phí khác nhau.
-* **Cơ cấu 4 trang trong file mẫu**:
-  * **Trang 1**: Hóa đơn GTGT dịch vụ Cloud Server (FPT Telecom) - 15.000.000 VNĐ (VAT 10% = 1.500.000 VNĐ).
-  * **Trang 2**: Hóa đơn tiền điện văn phòng (EVN Hà Nội) - 8.500.000 VNĐ (VAT 8% = 680.000 VNĐ).
-  * **Trang 3**: Giấy đề nghị thanh toán công tác phí của nhân viên - 4.200.000 VNĐ (Không thuế VAT).
-  * **Trang 4**: Biên lai vé cầu đường cũ mờ (Không hợp lệ, thiếu MST và chữ ký số).
+* **Chủ đề**: So sánh chuyên sâu Data Orchestration thế hệ cũ (Airflow) và thế hệ mới (Dagster).
+* **Định dạng**: Live Demo thực chiến trên cùng một bài toán bóc tách hóa đơn đa trang.
 
 ---
 **🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Mỗi đầu tháng, phòng kế toán nhận hàng trăm file PDF scan. Điển hình như file `chung_tu_dau_vao_thang_3.pdf` này. File gồm 4 trang nhưng tính chất khác nhau hoàn toàn: có hóa đơn VAT chuẩn, có hóa đơn điện EVN, có thanh toán công tác phí không thuế, và có cả chứng từ rác không hợp lệ. Hệ thống bắt buộc phải tự động bóc tách, rẽ đúng nhánh xử lý, kiểm tra toán học và chặn đứng các sai phạm ngân sách."
+> "Kính chào anh chị và các bạn. Hôm nay chúng ta sẽ cùng tìm hiểu và so sánh thực chiến hai công cụ điều phối dữ liệu (Data Orchestration) mã nguồn mở phổ biến và mạnh mẽ nhất hiện nay: Apache Airflow và Dagster. Để đánh giá trực quan nhất, chúng ta sẽ xuất phát từ chính bối cảnh các dự án hiện tại của team và giải quyết cùng một bài toán cụ thể."
 
 ---
 
-## SLIDE 3: QUY TRÌNH 4 BƯỚC & 3 CHỐT CHẶN KIỂM ĐỊNH
-### **Luồng Nghiệp Vụ Song Song & Kiểm Toán Ngân Sách**
+## SLIDE 2: AWS STEP FUNCTION
+### **Bối Cảnh Hiện Trạng Team & Thách Thức Khi Chuyển Đổi**
 
-```text
-[PDF Hóa Đơn 4 Trang]
-       │
-       ▼ (Check 1: File Integrity - File hợp lệ > 0 trang)
-[Tách Từng Trang (Page Splitter)]
-       │
-       ├─────────────────┬──────────────────┬─────────────────┐
-       ▼                 ▼                  ▼                 ▼
-[Nhánh 1: VAT]   [Nhánh 2: EVN]     [Nhánh 3: Công tác] [Nhánh 4: Invalid]
- (FPT Server)     (Điện văn phòng)   (Thanh toán tạm)     (Biên lai hỏng)
-       │                 │                  │                 │
-       └─────────────────┴──────────────────┴─────────────────┘
-                                 │
-                                 ▼ (Check 2: VAT Tax Math: Total == Subtotal + VAT)
-                                 ▼ (Check 3: Budget Limit <= 100.000.000 VNĐ)
-                  [Ghi Sổ Cái Kế Toán (Expense Ledger)]
-```
+| ✅ PROS (Lợi Thế) | ❌ CONS (Hạn Chế) |
+| :--- | :--- |
+| • Không cần quản lý hạ tầng | • Khó Test và Debug ở Local |
+| • Auto-scaling | • Chi phí tăng vọt khi tải lớn |
+| • Trả phí theo tải | • Bảo mật dữ liệu |
+| • Tích hợp sâu với các dịch vụ khác của AWS | • Phụ thuộc vào AWS |
 
-* **Chốt chặn 1 (File Integrity)**: Kiểm tra file PDF có bị hỏng (corrupt) không, số trang > 0.
-* **Chốt chặn 2 (VAT Tax Math)**: Xác thực công thức thuế: `Total = Subtotal + VAT`.
-* **Chốt chặn 3 (Budget Compliance)**: Chặn đứng mọi hóa đơn có tổng tiền > 100.000.000 VNĐ hoặc $\le$ 0. Nếu vi phạm, **tuyệt đối không cho phép ghi vào sổ cái**!
+* **Câu hỏi chiến lược**: *"Nếu bài toán đòi hỏi chạy On-Premise, kiểm soát chi phí hoặc tự chủ bảo mật dữ liệu khách hàng, team mình sẽ dùng công cụ gì để thay thế?"*
 
 ---
 **🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Đây là luồng nghiệp vụ 100% giống nhau mà chúng ta sẽ yêu cầu cả Airflow và Dagster cùng giải quyết. Nhìn sơ đồ rất đơn giản, nhưng để thể hiện được 4 nhánh rẽ song song trên giao diện, và đặc biệt là cơ chế 'chặn đứng khi vi phạm ngân sách', hai hệ thống sẽ giải quyết theo hai trường phái kiến trúc đối lập nhau hoàn toàn."
+> "Như team mình đều biết, hầu hết các dự án hiện tại đều đang sử dụng AWS Step Functions và AWS Lambda. Ưu điểm không thể phủ nhận: không cần lo hạ tầng, auto-scale cực tốt và trả tiền theo mức dùng. Tuy nhiên nhược điểm là chi phí state transition rất cao khi tải lớn, khó debug/test cục bộ ở local, và bị phụ thuộc chặt vào AWS. Do đó, nếu bài toán đòi hỏi chạy On-Premise hoặc tối ưu chi phí, chúng ta cần tìm giải pháp mới."
 
 ---
 
-<!-- ========================================================================= -->
-<!-- PHẦN 2: DEMO HỆ THỐNG -->
-<!-- ========================================================================= -->
+## SLIDE 3: BÀI TOÁN: TỰ ĐỘNG BÓC TÁCH & DUYỆT HÓA ĐƠN (PDF -> DATA)
+### **Nghiệp Vụ 4 Loại Invoice & Luồng Kiểm Định Phê Duyệt**
 
-# PHẦN 2: LIVE DEMO HỆ THỐNG (TWO WORLDS)
+#### **1. Phân loại 4 trang hóa đơn (4 Invoice Types)**
+* **VAT Invoice**: Lấy MST, tiền hàng & tiền thuế.
+* **Utility Invoice**: Lấy Customer ID để đối chiếu điện/nước.
+* **Travel Expense Invoice**: Lấy Employee ID để hoàn tiền công tác.
+* **Retail Receipt (No Tax ID)**: ⚠️ Gắn cờ cảnh báo: Không duyệt trừ thuế.
 
----
+#### **2. Luồng xử lý & Điều kiện duyệt**
+* **Bước 1 (Nhận file)**: Kiểm tra file chuẩn, không lỗi.
+* **Bước 2 (Bóc tách)**: Tách 4 trang &harr; Đọc dữ liệu theo từng type.
+* **Bước 3 (Kiểm tra)**:
+  * Tiền hàng + Tiền thuế có khớp tổng tiền không?
+  * Tổng tiền cả xấp có vượt hạn mức (100tr) không?
+* **Bước 4 (Kết quả)**:
+  * ✅ **Đạt chuẩn**: Duyệt &harr; Lưu vào hệ thống.
+  * ❌ **Vượt hạn mức / Lỗi**: Không duyệt &harr; Dừng ngay lập tức!
 
-## SLIDE 4: DEMO TRÊN AIRFLOW UI
-### **TaskFlow API, Dynamic Branching & Dynamic Task Mapping**
-
-* **Giao diện Graph View**:
-  * Hiển thị nhánh rẽ từ `branch_by_invoice_type`: rẽ vào 4 hàm `@task` chuyên biệt.
-  * Sử dụng cơ chế `.expand()`: các trang cùng loại chạy song song dưới dạng mapped instances.
-  * Dùng `TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS` để gộp 4 nhánh về `aggregate_monthly_ledger`.
-* **Cơ chế chặn vi phạm**:
-  * Dùng task rẽ nhánh `branch_on_budget_compliance` $\rightarrow$ Nhảy sang task `flag_budget_violation` và bỏ qua (`skip`) task `commit_to_database`.
-
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Xin mời các anh chị quan sát màn hình Airflow tại cổng 8080. 
-> Trên Graph View, Airflow vẽ đồ thị các ô vuông biểu thị cho các 'Task' (Hành động). Khi kích hoạt DAG, ta thấy nhánh rẽ xuất hiện. Các trang được đẩy vào từng hộp xử lý. 
-> Tuy nhiên, hãy để ý: Airflow chỉ báo trạng thái Xanh lá cây (Success) hoặc Đỏ (Failed). Bản thân giao diện Airflow không cho ta biết bên trong mỗi hộp đó dữ liệu gồm những hóa đơn nào, trị giá bao nhiêu tiền, trừ khi ta phải bấm vào từng task rồi mò vào tab XCom hoặc đọc hàng trăm dòng log chữ đen."
-
----
-
-## SLIDE 5: DEMO TRÊN DAGSTER UI
-### **Software-Defined Assets & Asset Checks Trực Quan Hóa**
-
-* **Giao diện Asset Lineage (Phả hệ Dữ liệu)**:
-  * Không vẽ task vô định, mà vẽ **Tài sản dữ liệu (Data Assets)**:
-    `raw_multipage_invoice_pdf` $\rightarrow$ `extracted_invoice_pages` $\rightarrow$ `categorized_invoices` $\rightarrow$ `monthly_financial_expense_ledger`.
-* **Chốt chặn Asset Checks hiển thị cấp 1 (First-Class Citizen)**:
-  * Đi kèm mỗi Asset là các tag Check màu xanh/đỏ: `check_pdf_file_integrity`, `check_vat_tax_math`, `check_budget_limit_compliance`.
-  * Khi ngân sách vượt 100M VND $\rightarrow$ Check văng `PASSED: False` với thuộc tính `blocking=True`, **lập tức ngắt luồng**, Asset sổ cái hạ nguồn không được sinh ra!
-
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Bây giờ, hãy nhìn sang giao diện Dagster tại cổng 3000. 
-> Đây là điều khác biệt lớn nhất: Thay vì nhìn thấy các tác vụ vô hình, ta nhìn thấy chính xác 'Hóa đơn tháng 3' và 'Sổ cái kế toán'. 
-> Đặc biệt, nhìn vào ô `monthly_financial_expense_ledger`, có 2 chiếc khiên bảo vệ màu xanh: đó là Asset Checks. Nếu kế toán nạp nhầm hóa đơn 120 triệu, chiếc khiên chuyển sang màu đỏ rực, pipeline dừng lại ngay lập tức và ghi rõ lý do vi phạm metadata ngay trên màn hình chính mà không cần lục log."
-
----
-
-<!-- ========================================================================= -->
-<!-- PHẦN 3: PHÂN TÍCH CODE AIRFLOW & CẤU TẠO HOẠT ĐỘNG NGẦM -->
-<!-- ========================================================================= -->
-
-# PHẦN 3: PHÂN TÍCH CODE AIRFLOW & CẤU TẠO HOẠT ĐỘNG NGẦM
-
----
-
-## SLIDE 6: MỔ XẺ FILE CODE AIRFLOW (`invoice_multipage_pdf_dag.py`)
-### **Cách Định Nghĩa Task, Branching và Luân Chuyển Dữ Liệu**
-
-```python
-# 1. ĐỊNH NGHĨA DAG & TASK CƠ BẢN
-@dag(dag_id="invoice_multipage_pdf_dag", schedule=None)
-def invoice_multipage_pdf_dag():
+#### **3. Sơ đồ dòng chảy (Architecture Flowchart)**
+```mermaid
+graph TD
+    A["📄 Input PDF (4 Pages)"] --> B["✂️ Split Pages"]
     
-    # 2. TASK RẼ NHÁNH: Trả về string là task_id tiếp theo
-    @task.branch
-    def check_file_integrity_and_branch(file_meta: dict):
-        if file_meta.get("is_valid") and file_meta.get("total_pages", 0) > 0:
-            return "extract_pages"
-        return "quarantine_corrupt_pdf"
+    B --> P1["VAT Invoice –<br/>Extract Tax ID, Net & VAT"]
+    B --> P2["Utility Invoice –<br/>Extract Customer ID"]
+    B --> P3["Travel Expense Invoice –<br/>Extract Employee ID"]
+    B --> P4["Retail Receipt (No Tax ID) –<br/>⚠️ Flag: Reject Tax Deduction"]
+    
+    P1 & P2 & P3 & P4 --> V{"🔍 VALIDATION –<br/>Math check: Net + VAT = Total?<br/>Within budget: <= 100M VND?"}
+    
+    V -- "Pass" --> S1["✅ APPROVED –<br/>Write to Database / Ledger"]
+    V -- "Fail" --> S2["❌ REJECTED –<br/>Hard Stop Pipeline!"]
 
-    # 3. DYNAMIC MAPPING: Xử lý song song theo danh sách trang
-    @task
-    def extract_vat_invoice(page: dict) -> dict: ...
-    @task
-    def extract_utility_invoice(page: dict) -> dict: ...
-
-    vat_results = extract_vat_invoice.expand(page=vat_pages)
-
-    # 4. GỘP CÁC NHÁNH BỎ QUA (SKIPPED): Phải dùng TriggerRule đặc biệt
-    @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-    def aggregate_monthly_ledger(all_processed_pages: list): ...
+    style A fill:#e2e8f0,stroke:#64748b,color:#0f172a
+    style B fill:#f1f5f9,stroke:#94a3b8,color:#0f172a
+    style P1 fill:#f8fafc,stroke:#38bdf8,color:#0f172a
+    style P2 fill:#f8fafc,stroke:#38bdf8,color:#0f172a
+    style P3 fill:#f8fafc,stroke:#38bdf8,color:#0f172a
+    style P4 fill:#fff1f2,stroke:#f43f5e,color:#991b1b
+    style V fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    style S1 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style S2 fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
 ```
 
 ---
 **🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Hãy mổ xẻ code Airflow mà chúng ta vừa viết:
-> Thứ nhất: `@task.branch` bắt buộc hàm phải trả về string chứa tên của `task_id` tiếp theo. Nghĩa là code logic nghiệp vụ bị trói cứng vào tên của task trong DAG.
-> Thứ hai: Để 4 nhánh chạy song song nhưng không bị lỗi khi một vài nhánh không có trang nào, ta phải cấu hình `TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS`. Nếu quên dòng này, toàn bộ pipeline sẽ bị treo hoặc báo fail do cơ chế mặc định `all_success`.
-> Thứ ba: Làm sao dữ liệu đi từ hàm này sang hàm kia? Đó là qua cơ chế XCom."
+> "Để hiểu rõ hai công cụ, chúng ta đi từ bài toán nghiệp vụ thực tế: Hệ thống nhận file scan gồm 4 trang hóa đơn, phân loại thành 4 invoice types: VAT Invoice, Utility Invoice, Travel Expense Invoice và Retail Receipt không có MST. Toàn bộ quy trình đi qua 4 bước: Nhận file -> Bóc tách song song -> Kiểm tra toán học thuế & trần ngân sách 100tr -> Chốt Sổ cái (Approved) hoặc ngắt pipeline (Rejected)."
 
 ---
 
-## SLIDE 7: CẤU TẠO 4 THÀNH PHẦN TRỤ CỘT CỦA AIRFLOW
-### **Kiến Trúc Được Thiết Kế Từ Năm 2014 (Airbnb)**
+## SLIDE 4: GÓC NHÌN AIRFLOW & DAGSTER
+### **So Sánh Bản Chất Thiết Kế & Kiến Trúc Điều Phối**
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                      APACHE AIRFLOW                         │
-│                                                             │
-│   ┌───────────────┐     Quét code liên tục   ┌───────────┐  │
-│   │   Webserver   │ ◄──────────────────────► │ Scheduler │  │
-│   └───────┬───────┘                          └─────┬─────┘  │
-│           │                                        │        │
-│           │ Đọc/Ghi trạng thái task, XCom, logs    │        │
-│           ▼                                        ▼        │
-│     ┌─────────────────────────────────────────────────┐     │
-│     │        Metadata Database (PostgreSQL)           │     │
-│     └─────────────────────────────────────────────────┘     │
-│                              ▲                              │
-│                              │ Ghi nhận trạng thái hoàn tất │
-│                   ┌──────────┴──────────┐                   │
-│                   │   Worker/Executor   │                   │
-│                   │ (Celery / K8s Pods) │                   │
-│                   └─────────────────────┘                   │
-└─────────────────────────────────────────────────────────────┘
-```
+#### **1. Bản chất hai triết lý thiết kế (Bullet points)**
+* **⚙️ Apache Airflow (2014) – Task-Centric (Bên trái)**:
+  * **Câu hỏi cốt lõi**: *"Tôi phải LÀM gì tiếp theo?"* (Tư duy To-Do List)
+  * **Trọng tâm**: Hành động thực thi (`Functions`, `Operators`, `Tasks`)
+  * **Trạng thái**: Chỉ quản lý mã thoát `Success` / `Failed` (**Mù dữ liệu**)
+  * **Truyền tin**: Dùng `XCom` serialize JSON vào database PostgreSQL
+* **💎 Dagster (2019) – Asset-Centric (Bên phải)**:
+  * **Câu hỏi cốt lõi**: *"Tôi đang tạo ra & duy trì TÀI SẢN DỮ LIỆU nào?"*
+  * **Trọng tâm**: Dữ liệu là công dân hạng nhất (`Software-Defined Assets`)
+  * **Trạng thái**: Quản lý phiên bản, schema, số dòng, **Data Lineage**
+  * **Chất lượng & Lưu trữ**: `Asset Checks` chặn vi phạm + `I/O Manager` cắm rút
 
-* **Scheduler (Bộ não)**: Chạy vòng lặp (Heartbeat loop) vô tận, liên tục nạp file Python từ ổ đĩa để tính toán đồ thị phụ thuộc.
-* **Metadata Database (Trái tim)**: Chứa toàn bộ trạng thái DAG Run, Task Instance, User, Connection và dữ liệu XCom.
-* **Executor / Worker**: Nhận lệnh từ Scheduler để chạy các tiến trình Python con.
+#### **2. Sơ đồ đối chiếu 2 góc nhìn (Architecture Flowchart - Diagrams in English)**
 
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Để hiểu vì sao Airflow gặp khó khăn với các bài toán dữ liệu hiện đại, ta phải nhìn vào cấu tạo 4 thành phần này. 
-> Airflow ra đời năm 2014, thời điểm mà người ta chỉ cần một công cụ Cronjob mạnh mẽ để kích hoạt các job Hadoop/Hive chạy ban đêm. 
-> Mọi giao tiếp giữa Scheduler, Webserver và Worker đều đi qua một chiếc 'nút cổ chai' duy nhất: Metadata Database PostgreSQL."
+```mermaid
+flowchart LR
+    subgraph Airflow_View ["VIEW 1: AIRFLOW (TASK-CENTRIC FLOW)"]
+        direction TB
+        subgraph S1 ["1. Ingest & Integrity"]
+            T1["📄 ingest_pdf<br/><i>(4-Page PDF)</i>"] --> T2{"⚙️ check_integrity<br/><i>(@task.branch)</i>"}
+            T2 -- "Invalid" --> Terr["⚠️ handle_error"]
+        end
+        subgraph S2 ["2. Parallel OCR (.expand)"]
+            P1["⚡ vat_invoice (55M)"]
+            P2["⚡ utility_invoice (1.85M)"]
+            P3["⚡ reimbursement (3.2M)"]
+            P4["⚡ invalid_invoice (⚠️)"]
+        end
+        subgraph S3 ["3. Collect & Audit"]
+            T4["📥 collect_invoices<br/><i>(TriggerRule)</i>"] --> T5{"🔍 audit_budget<br/><i>(Budget <= 100M)</i>"}
+            T5 -- "Pass" --> T6["✅ lock_ledger<br/><i>(60.2M)</i>"]
+            T5 -- "Fail" --> T7["❌ alert_skip"]
+        end
+        T2 -- "Valid" --> S2
+        P1 & P2 & P3 & P4 --> T4
+    end
 
----
-
-## SLIDE 8: CÁCH CHẠY NGẦM CỐT LÕI CỦA AIRFLOW
-### **Vòng Lặp Phân Tích (DAG Parsing Loop) & XCom Lifecycle**
-
-* **1. Chu kỳ quét file (DAG Parsing)**:
-  * Scheduler không lưu code cố định trên RAM. Cứ mỗi $N$ giây (mặc định 30s), nó đọc lại toàn bộ code của mọi file trong thư mục `dags/`.
-  * Nếu trong file có code gọi API bên ngoài hoặc import thư viện nặng $\rightarrow$ Scheduler bị nghẽn (CPU Spike).
-* **2. Vòng đời thực thi Task**:
-  `NONE` $\rightarrow$ `SCHEDULED` $\rightarrow$ `QUEUED` $\rightarrow$ `RUNNING` $\rightarrow$ `SUCCESS` / `FAILED`
-* **3. Cơ chế XCom (Cross-Communication)**:
-  * Khi hàm `extract_pages` trả về 1 danh sách dict: Airflow serialize đối tượng thành chuỗi JSON / Pickle rồi chèn (INSERT) vào bảng `xcom` trong Database PostgreSQL!
-  * Task tiếp theo đọc dữ liệu bằng cách thực hiện câu lệnh `SELECT ... FROM xcom`.
-
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Khi một task return về dữ liệu trong Airflow, dữ liệu đó bị biến thành chuỗi text và ném thẳng vào database PostgreSQL của hệ thống. Nếu danh sách hóa đơn lớn hoặc chứa file ảnh base64, database của Airflow sẽ nhanh chóng bị phình to (bloat), làm chậm toàn bộ cụm điều phối!"
-
----
-
-<!-- ========================================================================= -->
-<!-- PHẦN 4: TỪ CẤU TẠO ĐẾN HẠN CHẾ CỐT TỬ -> DAGSTER CÓ GÌ MỚI -->
-<!-- ========================================================================= -->
-
-# PHẦN 4: TỪ CẤU TẠO $\rightarrow$ HẠN CHẾ CỐT TỬ $\rightarrow$ DAGSTER GIẢI QUYẾT RA SAO?
-
----
-
-## SLIDE 9: HẠN CHẾ 1: "MÙ DỮ LIỆU" (DATA BLINDNESS)
-### **Nỗi Đau: Task Thành Công Nhưng Dữ Liệu Hỏng**
-
-* **Gốc rễ cấu tạo của Airflow**: 
-  * Airflow là **Task-Centric**. Nó chỉ quan tâm tiến trình chạy có trả về mã thoát `0` hay không.
-  * Task bóc tách hóa đơn xong trả về file rỗng $\rightarrow$ Airflow vẫn bật đèn xanh `SUCCESS`.
-* **Dagster giải quyết bằng: Software-Defined Assets (SDA)**:
-  * Đổi tư duy từ: *"Tôi phải chạy hàm gì?"* sang *"Tôi đang tạo ra tài sản dữ liệu gì?"*.
-  * Asset phản ánh trạng thái thực của dữ liệu: phiên bản dữ liệu (data version), schema, số lượng dòng, thời điểm cập nhật cuối cùng.
-
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Điểm hạn chế đầu tiên sinh ra từ cấu tạo Task-centric: Airflow hoàn toàn 'mù' về dữ liệu. Với kế toán, họ không cần biết bạn chạy bao nhiêu Task, họ chỉ cần biết: 'Hóa đơn tháng 3 đã sẵn sàng chưa và số liệu có chuẩn không?'. Dagster đưa Dữ liệu trở thành công dân hạng nhất, phản ánh trung thực giá trị nghiệp vụ."
-
----
-
-## SLIDE 10: HẠN CHẾ 2: CỰC HÌNH VIẾT TEST & LOCAL DEBUG
-### **Nỗi Đau: Muốn Test 1 Hàm Phải Dựng Cả Cụm Database**
-
-* **Gốc rễ cấu tạo của Airflow**:
-  * Các task của Airflow bị trói chặt vào `Airflow Context` (`ti`, `run_id`, `xcom_pull`, DB Connection).
-  * Viết `pytest` cho 1 task bình thường sẽ văng lỗi `KeyError: 'ti'` ngay lập tức.
-  * Muốn Integration Test toàn bộ DAG, bắt buộc phải khởi tạo Database PostgreSQL/SQLite, chạy `airflow db migrate` rất nặng và chậm trong CI/CD.
-* **Dagster giải quyết bằng: Pure Python Function & `materialize()` in RAM**:
-  * Asset bản chất là một **hàm Python thuần khiết**.
-  * Chạy test bằng `pytest` xong trong **0.05 giây**:
-
-```python
-# Test trọn vẹn pipeline trong RAM, KHÔNG CẦN DATABASE, KHÔNG CẦN SERVER:
-def test_invoice_pipeline():
-    result = materialize([
-        raw_multipage_invoice_pdf, 
-        extracted_invoice_pages, 
-        categorized_invoices
-    ])
-    assert result.success
+    subgraph Dagster_View ["VIEW 2: DAGSTER (ASSET-CENTRIC GRAPH)"]
+        direction TB
+        subgraph D1 ["1. Ingest & OCR"]
+            C1{{"🛡️ check_integrity"}} -.-> A1[("📄 raw_pdf<br/><i>(4-Page)</i>")]
+            A1 --> A2[("📑 extracted_pages<br/><i>(OCR Text)</i>")]
+        end
+        subgraph D2 ["2. Category Assets"]
+            V1[("⚡ vat_invoices (55M)")]
+            V2[("⚡ utility_invoices (1.85M)")]
+            V3[("⚡ reimbursement (3.2M)")]
+            V4[("⚡ invalid_invoices (⚠️)")]
+        end
+        subgraph D3 ["3. Ledger & Shields"]
+            A3[("📊 categorized_invoices")]
+            C2{{"🛡️ check_vat_math"}} -.-> A3
+            C3{{"🛡️ check_budget <= 100M<br/><i>(blocking=True)</i>"}} -.-> A3
+            A3 --> A4[("💎 expense_ledger<br/><i>(Approved 60.2M)</i>")]
+        end
+        A2 --> D2
+        V1 & V2 & V3 & V4 --> A3
+    end
 ```
 
 ---
 **🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Đây chính là câu trả lời vì sao Dagster lại dễ test hơn Airflow gấp 10 lần. 
-> Trong file `test_invoice_processing.py`, chúng ta vừa chạy 4 bài test chỉ trong 0.12 giây bằng Pytest. Không cần mở Webserver, không cần Postgres, không sinh ra một file rác nào trên ổ cứng. Lập trình viên có thể viết test TDD ngay trên máy cá nhân trước khi đẩy code lên Git."
+> "Nhìn vào sơ đồ 2 góc nhìn: 
+> - **Bên trái (Airflow - Task-Centric)**: Chuỗi các hành động thực thi hình chữ nhật nối tiếp nhau. Muốn rẽ nhánh hay gộp nhánh ta phải tự viết code điều hướng kỹ thuật và cấu hình TriggerRule.
+> - **Bên phải (Dagster - Asset-Centric)**: Chuỗi các tài sản dữ liệu sống hình trụ. Đi kèm mỗi tài sản là các chiếc khiên kiểm định Asset Checks độc lập. Nếu vi phạm ngân sách 100M, chiếc khiên sẽ tự động ngắt cầu dao ngay tại chỗ, bảo vệ sổ cái.
+> 
+> Bây giờ, hãy cùng xem sự khác biệt này thể hiện trực tiếp trên giao diện thực tế như thế nào!"
 
----
+## SLIDE 5: 1 TASK TRONG AIRFLOW
+### **Nút Thắt Vòng Lặp Parsing & Cơ Chế Ép Nạp XCom Vào Postgres**
 
-## SLIDE 11: HẠN CHẾ 3: NGHẼN CỔ CHAI XCOM
-### **Nỗi Đau: Dữ Liệu Bị Ép Đi Qua Database Hệ Thống**
+#### **1. Phân tích chi tiết 4 điểm nghẽn trong vòng đời Task (Bullet points)**
+* 🔄 **1. Bị ép Re-Parse liên tục (30 giây/lần)**:
+  * Scheduler không lưu sẵn cấu trúc trên RAM mà liên tục đọc và biên dịch lại code Python từ đĩa.
+  * Nếu developer gọi API HTTP hoặc import thư viện nặng (OCR, PyTorch) ngoài hàm &rarr; **Treo 100% CPU toàn cụm**.
+* 🗄️ **2. State Machine bắn query DB dồn dập**:
+  * Mỗi bước chuyển trạng thái (`None` &rarr; `Scheduled` &rarr; `Queued` &rarr; `Running` &rarr; `Success`) đều phải `UPDATE` vào bảng `task_instance` của PostgreSQL.
+  * Khi có hàng nghìn task, metadata database bị nghẽn I/O và dễ xảy ra deadlock.
+* 📦 **3. Ép nạp dữ liệu XCom thẳng vào database**:
+  * Khi task `return` dữ liệu, Airflow ép serialize JSON/Pickle và `INSERT INTO xcom` trực tiếp vào database hệ thống.
+  * Dữ liệu lớn (ảnh PDF, DataFrame) làm **tràn bộ nhớ DB** và làm chậm toàn bộ cụm điều phối.
+* 👁️ **4. Kết thúc bằng "Mù dữ liệu" trên UI**:
+  * Webserver chỉ query DB để tô màu ô vuông Xanh (`Success`) hoặc Đỏ (`Failed`).
+  * Người điều hành **hoàn toàn không biết bên trong có bao nhiêu hóa đơn, bao nhiêu tiền** nếu không tự mò vào từng task đọc log.
 
-* **Gốc rễ cấu tạo của Airflow**:
-  * XCom lưu vào Metadata DB $\rightarrow$ Giới hạn kích thước vài megabyte. Muốn lưu file to, developer phải tự viết code upload lên MinIO/S3, rồi truyền đường dẫn string qua XCom $\rightarrow$ Code bị bẩn bởi logic hạ tầng.
-* **Dagster giải quyết bằng: I/O Manager (Cắm - Rút Lưu Trữ)**:
-  * Tách biệt 100% giữa **Logic tính toán** và **Nơi lưu trữ**:
-    * Môi trường **Production**: I/O Manager tự động đẩy kết quả lên S3/MinIO bucket.
-    * Môi trường **Local / CI Test**: I/O Manager tự động giữ trong bộ nhớ RAM (`mem_io_manager`).
-  * Code của lập trình viên hoàn toàn sạch sẽ, không chứa một dòng code S3 hay path ổ đĩa nào!
+#### **2. Sơ đồ thực thi Task trong Airflow (Lifecycle Diagram in English)**
 
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "I/O Manager của Dagster là một cuộc cách mạng về thiết kế phần mềm (Dependency Injection). Lập trình viên chỉ cần `return df` hoặc `return invoice_dict`. Việc lưu nó vào MinIO, S3 hay Postgres là do I/O Manager đảm nhận bên ngoài. Khi test, ta rút S3 ra và cắm RAM vào, cực kỳ linh hoạt."
-
----
-
-## SLIDE 12: HẠN CHẾ 4: MONOLITHIC PARSING & RỦI RO SẬP CỤM
-### **Nỗi Đau: Một File DAG Lỗi Cú Pháp Làm Treo Toàn Cụm Scheduler**
-
-* **Gốc rễ cấu tạo của Airflow**:
-  * Scheduler nạp trực tiếp file code Python của người dùng vào cùng một tiến trình hệ điều hành.
-  * Nếu ai đó viết lệnh cài sai thư viện hoặc vòng lặp vô tận trong file DAG, Scheduler có thể bị sập hoàn toàn.
-* **Dagster giải quyết bằng: Kiến Trúc gRPC Out-Of-Process**:
-  * Webserver và Daemon chạy tách biệt 100% với Code người dùng qua cổng kết nối gRPC.
-  * Code xử lý hóa đơn chạy trong Container riêng (Code Location). Nếu code có bị crash bộ nhớ (OOM), giao diện Dagster vẫn sáng đèn hoạt động bình thường và báo lỗi cách ly chính xác tại dòng đó!
-
----
-**🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Về mặt DevOps và bảo mật hệ thống, kiến trúc tách rời của Dagster ăn đứt Airflow. Trên Kubernetes, mỗi team có thể deploy một Code Location Pod riêng với thư viện Python độc lập. Team Hóa đơn dùng Python 3.12 không sợ bị xung đột thư viện với Team Machine Learning dùng Python 3.9."
-
----
-
-## SLIDE 13: HẠN CHẾ 5: THIẾU KIỂM ĐỊNH CHẤT LƯỢNG DỮ LIỆU
-### **Nỗi Đau: Dữ Liệu Bẩn Vẫn Lọt Vào Database Kế Toán**
-
-* **Gốc rễ cấu tạo của Airflow**:
-  * Muốn kiểm tra dữ liệu, phải tự đẻ thêm hàng tá task phụ: `validate_task`, `check_task`, `branch_task` làm đồ thị DAG phình to rối rắm.
-* **Dagster giải quyết bằng: First-Class Asset Checks**:
-  * Gắn trực tiếp kiểm định vào Asset:
-```python
-@asset_check(asset=monthly_financial_expense_ledger, blocking=True)
-def check_budget_limit_compliance(monthly_financial_expense_ledger: dict):
-    total = monthly_financial_expense_ledger.get("grand_total", 0)
-    passed = (0 < total <= 100_000_000)
-    return AssetCheckResult(
-        passed=passed, 
-        metadata={"total_amount": total, "threshold": 100_000_000}
-    )
+```mermaid
+flowchart LR
+    subgraph P1 ["Phase 1: Code & Scheduler"]
+        direction TB
+        S1["📁 1. Write Code<br/><i>(dags/*.py)</i>"] --> S2["🔄 2. Parsing Loop<br/><i>(Every 30s CPU)</i>"]
+        S2 --> S3[("🗄️ 3. State Machine<br/><b>[NONE ➔ QUEUED]</b>")]
+    end
+    subgraph P2 ["Phase 2: Execution & DB Hit"]
+        direction TB
+        S4["⚡ 4. Worker Pulls Task<br/><i>(State: <b>[RUNNING]</b>)</i>"]
+        S5[("📦 5. Ép Nạp XCom DB<br/><b>INSERT INTO xcom</b><br/><i>(JSON/Pickle in Postgres)</i>")]
+        S6["💻 6. Webserver DB Poll<br/><b>⚠️ DATA BLIND: No Data</b>"]
+        S4 --> S5
+        S4 --> S3
+        S5 -.-> S6
+    end
+    S3 -->|"Push Queue"| S4
 ```
-  * Thuộc tính `blocking=True`: Tự động ngắt luồng ngay lập tức khi phát hiện gian lận/sai lệch dữ liệu!
 
 ---
 **🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Với Airflow, muốn kiểm định dữ liệu ta phải viết các hàm rẽ nhánh phức tạp. Với Dagster, `@asset_check` là công dân hạng nhất. Nó vừa kiểm tra, vừa ghi nhận điểm số chất lượng (Data Observability), vừa có quyền lực tối cao để chặn đứng pipeline khi có rủi ro tài chính."
+> "Kính thưa các anh chị, đây là chu trình thực thi của 1 task trong Airflow:
+> 1. Khi ta nạp file code, Scheduler phải chạy vòng lặp DAG Parsing Loop mỗi 30 giây để đọc lại code từ đĩa, gây nghẽn CPU nếu có import nặng.
+> 2. Quá trình đổi trạng thái từ Scheduled sang Queued rồi Running phải liên tục bắn câu lệnh UPDATE vào PostgreSQL.
+> 3. Khi task muốn truyền dữ liệu cho task sau, dữ liệu bị nhồi thẳng vào bảng xcom của database, làm phình to DB.
+> 4. Cuối cùng, Webserver chỉ đọc DB để tô màu ô vuông Xanh/Đỏ mà hoàn toàn mù về dữ liệu nghiệp vụ bên trong!"
 
 ---
 
-<!-- ========================================================================= -->
-<!-- PHẦN 5: KẾT LUẬN & ĐỀ XUẤT -->
-<!-- ========================================================================= -->
+## SLIDE 6: TRONG DAGSTER
+### **Chu Trình Phân Tách gRPC, Lưu Trữ I/O & Khiên Asset Checks Gác Cổng**
 
-# PHẦN 5: KẾT LUẬN & ĐỀ XUẤT QUYẾT ĐỊNH
+#### **1. Phân tích chi tiết 4 ưu thế trong vòng đời Asset (Bullet points)**
+* 🛡️ **1. Khám phá Metadata qua gRPC (Zero Scheduler Load)**:
+  * Code người dùng chạy trong tiến trình riêng (User Code Server).
+  * Nền tảng chỉ dùng gRPC để hỏi schema và phả hệ lineage, **hoàn toàn không nạp code Python của user vào Scheduler**.
+* 🚀 **2. Chạy trong Worker độc lập (Ephemeral Worker)**:
+  * Mỗi lần chạy bật một container/pod độc lập thực thi hàm Asset thuần khiết.
+  * Code có crash hay OOM thì **Daemon và Webserver vẫn an toàn 100%**. Reload code mới tức thì không cần restart cụm.
+* 💾 **3. I/O Manager độc lập & Không đụng DB**:
+  * Dữ liệu trả về được I/O Manager tự động đẩy thẳng lên **Object Storage (S3/MinIO) hoặc Snowflake**.
+  * Database hệ thống chỉ lưu nhật ký sự kiện nhẹ nhàng, không bao giờ bị nghẽn bởi data payload.
+* 🛡️ **4. Khiên Asset Checks gác cổng tại chỗ**:
+  * Chiếc khiên kiểm định `@asset_check(blocking=True)` chạy ngay trong chu trình: nếu vượt ngân sách 100M, **ngắt luồng tại chỗ**, ghi nhận lý do và cập nhật real-time lên UI cho cả team cùng thấy.
+
+#### **2. Sơ đồ vòng đời khởi tạo Asset trong Dagster (Lifecycle Diagram in English)**
+
+```mermaid
+flowchart LR
+    subgraph D_P1 ["Phase 1: Discovery & Trigger"]
+        direction TB
+        D1["📦 1. User Code Server<br/><i>(Isolated gRPC Process)</i>"]
+        D2["🌐 2. gRPC Discovery<br/><i>(Zero Scheduler Load)</i>"]
+        D3["⏱️ 3. Trigger & Plan<br/><i>(Sensor / Schedule / UI)</i>"]
+        D1 --> D2 --> D3
+    end
+    subgraph D_P2 ["Phase 2: Isolated Run & Shields"]
+        direction TB
+        D4["🚀 4. Ephemeral Worker<br/><i>(Isolated Run Container)</i>"]
+        D5[("💾 5A. Pluggable I/O<br/><b>S3 / MinIO / Snowflake</b>")]
+        D6{{"🛡️ 5B. Asset Checks<br/><b>Budget <= 100M</b>"}}
+        D7["📊 6. Real-time Event UI<br/><b>✅ Live Lineage & Metrics</b>"]
+        D4 --> D5
+        D4 --> D6
+        D5 & D6 --> D7
+    end
+    D3 --> D4
+```
+
+---
+**🎙️ Lời thoại diễn giả (Speaker Notes):**
+> "Bây giờ, hãy nhìn sang toàn bộ vòng đời khởi tạo 1 tài sản trong Dagster:
+> 1. Toàn bộ code xử lý dữ liệu được cô lập trong User Code Server, nói chuyện với nền tảng qua gRPC. Scheduler không cần nạp code nặng.
+> 2. Mỗi lần chạy, Dagster bật một Worker Pod độc lập để tính toán. Code có crash cũng không ảnh hưởng hệ thống.
+> 3. Dữ liệu tính toán xong được I/O Manager đẩy thẳng lên S3 hoặc Snowflake, database chỉ lưu nhật ký sự kiện Event Log cực nhẹ.
+> 4. Ngay trong chu trình chạy, chiếc khiên Asset Checks tự động thẩm định dữ liệu. Nếu vượt ngân sách 100 triệu, nó ngắt luồng tại chỗ và báo đỏ trực tiếp trên giao diện cho cả team cùng thấy!"
 
 ---
 
-## SLIDE 14: MA TRẬN SO SÁNH TỔNG HỢP 7 TIÊU CHÍ
+## SLIDE 7: HẠ TẦNG ON-PREMISE & ĐỊNH VỊ NỀN TẢNG (4 TRỤ CỘT)
+### **Hiện Thực Hóa Chuyển Dịch Lên K8s, CI/CD 0.12s & Khung Quyết Định Công Nghệ**
+
+#### **1. Kiến Trúc Hạ Tầng On-Premise (Ops Overhead)**
+* 🔴 **Apache Airflow On-Prem (6 thành phần rời rạc - Cồng kềnh & Dễ nghẽn)**:
+  * **Thành phần:** Scheduler + Celery Worker Pool + Redis Queue + Postgres HA + Webserver + Triggerer.
+  * **Nỗi đau đĩa chia sẻ:** Bắt buộc dựng cụm NFS/EFS chia sẻ để đồng bộ file code `dags/` giữa các node.
+  * **Xung đột package:** Toàn bộ task chung Python env; 1 team upgrade pandas có thể làm gãy pipeline team khác.
+* 🟢 **Dagster On-Prem (Chuẩn Kubernetes & Cloud-Native - Tinh gọn & Độc lập)**:
+  * **Thành phần:** Chỉ cần Dagster Webserver + Daemon + PostgreSQL HA (chỉ lưu metadata nhật ký nhẹ).
+  * **Lưu trữ đối tượng:** Cụm MinIO phân tán đóng vai trò S3 nội bộ, I/O Manager tự động đẩy/kéo dữ liệu.
+  * **Code Location Pods:** Đóng gói Docker độc lập. Mỗi team tự do dùng Python 3.10/3.11/3.12, cách ly hoàn toàn.
+
+#### **2. Năng Lực Kiểm Thử CI/CD & Trải Nghiệm Dev (DevX)**
+* ⚠️ **Airflow: Rào cản lớn khi viết Unit Test & CI/CD**:
+  * Task gắn chặt với `ti`, `context`, `dag_run`. Rất khó mock dữ liệu cục bộ.
+  * Muốn test pipeline phải dựng Docker Compose và chạy migrate PostgreSQL, mất vài phút &rarr; Khó đưa vào Pre-commit Git hook.
+* 💎 **Dagster: Unit Test trong RAM 0.12 Giây (4/4 Tests Passed)**:
+  * Asset là hàm Python thuần khiết (`Pure Function`). Chạy `pytest` hoàn toàn trong RAM cực nhanh (0.12s cho 4 tests), không cần DB.
+  * Chặn đứng vi phạm ngân sách trong 0.02s: `assert not check_budget_limit_compliance(mock_120m_invoices).passed`.
+  * Tự động kích hoạt kiểm thử trong GitLab CI / GitHub Actions mỗi khi tạo Pull Request trước khi merge.
+
+#### **3. Khi Nào Nên Chọn Apache Airflow?**
+* Điều phối hạ tầng chung (Infra Orchestration): Bật/tắt máy ảo, trigger job dbt snapshot, gửi email, dọn log hệ thống định kỳ.
+* Tác vụ độc lập, thô (Coarse-grained Batch): Kích hoạt các job Spark, Trino, Flink chạy độc lập, không cần trao đổi dữ liệu phức tạp.
+* Đã có sẵn cụm On-Premise ổn định: Doanh nghiệp đã đầu tư VM/Celery với Ops quen vận hành 6 thành phần & đĩa mạng NFS.
+* Kiểm thử truyền thống qua DB: Chấp nhận việc test gắn chặt với Database (dựng Compose mất 3 - 5 phút/lần).
+
+#### **4. Khi Nào Nên Chọn Dagster? (Đề Xuất Số 1)**
+* Thay thế AWS Step Functions On-Premise: Pipeline phân nhánh nghiệp vụ phức tạp, OCR và đối soát tài chính theo State Machine.
+* Hạ tầng Cloud-Native K8s tinh gọn: Chỉ 3 service cốt lõi (Webserver, Daemon, Postgres nhẹ). Lưu trữ MinIO S3 nội bộ (loại bỏ hoàn toàn NFS). Cô lập Pods qua gRPC.
+* Kiểm thử tự động CI/CD 0.12s: Viết unit test in-memory bằng `pytest` trong RAM, tích hợp mượt mà GitLab CI tự động trên từng Pull Request.
+* Bảo vệ chất lượng dữ liệu: Tích hợp sẵn Asset Checks (`blocking=True`) chặn đứng hóa đơn vượt ngân sách 100M ngay trong chu trình.
+
+---
+**🎙️ Lời thoại diễn giả (Speaker Notes):**
+> "Thưa các anh chị, slide này tổng hợp toàn diện 4 trụ cột chiến lược khi chuyển dịch On-Premise:
+> 1. Về hạ tầng On-Premise: Airflow đòi hỏi 6 thành phần cồng kềnh và đĩa chia sẻ NFS rất dễ nghẽn. Dagster kiến trúc Cloud-Native tinh gọn: 3 service cốt lõi, MinIO S3 và Pods K8s độc lập.
+> 2. Về kiểm thử CI/CD: Airflow dính chặt database rất khó viết unit test. Dagster là pure function, test in-memory bằng pytest 4/4 tests chỉ mất 0.12 giây, tích hợp mượt mà vào GitLab CI.
+> 3. Khi nào chọn Airflow: Khi cần điều phối hạ tầng chung, bật tắt máy ảo, trigger job Spark độc lập trên cụm server cũ có sẵn.
+> 4. Khi nào chọn Dagster: Đề xuất số 1 để thay thế AWS Step Functions, xử lý nghiệp vụ tài chính/OCR phức tạp, cần bảo vệ chất lượng dữ liệu và chuẩn hóa văn hóa phần mềm."
+
+---
+
+## SLIDE 8: MA TRẬN SO SÁNH TỔNG HỢP 7 TIÊU CHÍ
 
 | Tiêu Chí Kỹ Thuật | Apache Airflow 2.x | Dagster | Người Thắng Cuộc |
-| :--- | :--- | :--- | :---: |
+| :--- | :--- | :--- | :--- |
 | **1. Triết lý vận hành** | Task-Centric (Chạy tác vụ) | Asset-Centric (Quản lý dữ liệu) | **Dagster** |
 | **2. Tốc độ & Khả năng Test** | Khó khăn, phụ thuộc Database | Dễ dàng, chạy `pytest` trong RAM | **Dagster (Vượt trội)** |
 | **3. Luân chuyển dữ liệu** | XCom nghẽn qua DB | I/O Manager tách rời lưu trữ | **Dagster** |
@@ -390,29 +337,38 @@ def check_budget_limit_compliance(monthly_financial_expense_ledger: dict):
 
 ---
 
-## SLIDE 15: KHI NÀO DÙNG AI? (ĐỊNH VỊ ỨNG DỤNG DOANH NGHIỆP)
+## SLIDE 9: ĐỊNH VỊ ỨNG DỤNG & HIỆN THỰC HÓA ON-PREMISE (KHI NÀO CHỌN AI?)
 
 ```text
                NÊN CHỌN AIRFLOW                         NÊN CHỌN DAGSTER
      ┌────────────────────────────────────┐   ┌────────────────────────────────────┐
-     │ • Điều phối hạ tầng chung chung    │   │ • Nền tảng Dữ liệu & AI/LLM        │
-     │ • Bật/tắt máy ảo, trigger job dbt  │   │ • Xử lý văn bản, OCR, Tài chính    │
+     │ • Điều phối hạ tầng chung chung    │   │ • Thay thế AWS Step Functions      │
+     │ • Bật/tắt máy ảo, trigger job dbt  │   │ • Nền tảng Dữ liệu & AI/LLM        │
      │ • Doanh nghiệp có sẵn hạ tầng cũ   │   │ • Cần kiểm thử tự động CI/CD chuẩn │
+     │ • Cụm 6 thành phần & đĩa mạng NFS  │   │ • Cụm K8s Cloud-Native + MinIO S3  │
      │ • Đội ngũ quen với mô hình Cronjob │   │ • Dữ liệu cần truy xuất nguồn gốc  │
      └────────────────────────────────────┘   └────────────────────────────────────┘
 ```
 
-* **Khuyến nghị cho dự án thay thế AWS Step Functions**:
-  * Vì hệ thống cũ của chúng ta xử lý **nghiệp vụ tài chính, OCR chứng từ và kiểm tra điều kiện**, mô hình của Dagster khớp 100% với tư duy luân chuyển trạng thái của Step Functions nhưng mang lại khả năng mở rộng không giới hạn trên hạ tầng On-Premise.
+* **⚙️ Khi nào nên chọn Apache Airflow?**:
+  * Điều phối hạ tầng chung (bật/tắt máy ảo, trigger dbt snapshot, gửi email cảnh báo).
+  * Doanh nghiệp đã đầu tư cụm VM/Celery với đội ngũ Ops am hiểu việc bảo trì Redis/NFS.
+  * Tác vụ thô độc lập (Coarse-grained batch): job Spark, Flink chạy độc lập, không cần trao đổi dữ liệu phức tạp.
+  * Chấp nhận mô hình test truyền thống qua DB (dựng Docker Compose 3-5 phút).
+
+* **💎 Khi nào nên chọn Dagster? (ĐỀ XUẤT SỐ 1)**:
+  * Thay thế AWS Step Functions On-Premise: Pipeline phân nhánh nghiệp vụ phức tạp, OCR và đối soát tài chính theo State Machine.
+  * Hạ tầng Cloud-Native K8s tinh gọn: Chỉ 3 service cốt lõi; lưu trữ MinIO S3 nội bộ (loại bỏ hoàn toàn đĩa mạng NFS); cô lập Pods qua gRPC.
+  * Kiểm thử tự động CI/CD 0.12s: Viết unit test in-memory bằng `pytest` trong RAM, tích hợp mượt mà GitLab CI / GitHub Actions tự động kiểm thử trên từng Pull Request.
+  * Bảo vệ chất lượng dữ liệu: Tích hợp sẵn Asset Checks (`blocking=True`) chặn đứng hóa đơn vượt ngân sách 100M ngay trong chu trình chạy.
 
 ---
 **🎙️ Lời thoại diễn giả (Speaker Notes):**
-> "Chúng tôi không nói Airflow tệ. Nếu công ty chỉ cần một công cụ kích hoạt dbt hay chạy job Spark hàng đêm, Airflow vẫn dùng tốt. 
-> Nhưng với bài toán thay thế AWS Step Functions trên On-Premise: xử lý OCR văn bản, phân loại hồ sơ và kiểm soát rủi ro tài chính, **Dagster chính là sự lựa chọn số 1 của tương lai**."
+> "Chúng tôi không nói Airflow tệ. Nếu công ty chỉ cần một công cụ kích hoạt dbt hay chạy job Spark hàng đêm trên cụm máy chủ cũ, Airflow vẫn dùng tốt. Nhưng với bài toán cốt lõi của chúng ta: thay thế AWS Step Functions trên hạ tầng On-Premise/Kubernetes, lưu trữ MinIO S3, cần kiểm thử CI/CD tự động 0.12s và bảo vệ chất lượng dữ liệu OCR tài chính, Dagster chính là sự lựa chọn số 1 của tương lai."
 
 ---
 
-## SLIDE 16: LỘ TRÌNH TRIỂN KHAI 3 GIAI ĐOẠN (MIGRATION ROADMAP)
+## SLIDE 10: LỘ TRÌNH TRIỂN KHAI 3 GIAI ĐOẠN (MIGRATION ROADMAP)
 
 * **Giai đoạn 1: Chuẩn hóa & Thử nghiệm (Tháng 1 - 2)**
   * Dựng cụm Dagster trên Kubernetes On-Premise (Helm chart chuẩn).
@@ -430,14 +386,14 @@ def check_budget_limit_compliance(monthly_financial_expense_ledger: dict):
 
 ---
 
-## SLIDE 17: TỔNG KẾT & Q&A
+## SLIDE 11: TỔNG KẾT & Q&A
 ### **Cảm Ơn Ban Lãnh Đạo & Các Đồng Nghiệp!**
 
 * **Mã nguồn Demo & Tài liệu**: 
   * Repository: `Airflow_Dagster`
-  * Airflow DAG: [invoice_multipage_pdf_dag.py](file:///home/ducdm3/Self_training/AirFlow_Dagster/airflow_demo/dags/invoice_multipage_pdf_dag.py)
-  * Dagster Assets: [assets.py](file:///home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo/invoice_processing/assets.py)
-  * Unit Tests: [test_invoice_processing.py](file:///home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo/tests/test_invoice_processing.py)
+  * Airflow DAG: [invoice_multipage_pdf_dag.py](file:///home/duc/SelftTraining/Airflow_Dagster/airflow_demo/dags/invoice_multipage_pdf_dag.py)
+  * Dagster Assets: [assets.py](file:///home/duc/SelftTraining/Airflow_Dagster/dagster_demo/invoice_processing/assets.py)
+  * Unit Tests: [test_invoice_processing.py](file:///home/duc/SelftTraining/Airflow_Dagster/dagster_demo/tests/test_invoice_processing.py)
 * **Sẵn sàng giải đáp thắc mắc (Q&A)**.
 
 ---

@@ -28,24 +28,34 @@ Thay vì bóc tách thủ công, hệ thống cần tự động:
 
 ```mermaid
 graph TD
-    A["File PDF Đầu Vào (chung_tu_dau_vao_thang_3.pdf)"] --> B{"CHECK 1: File PDF có hợp lệ & > 0 trang?"}
+    A["Input Multi-page PDF (chung_tu_dau_vao_thang_3.pdf)"] --> B{"CHECK 1: File Integrity & Page Count > 0?"}
     
-    B -- "File hỏng / 0 KB" --> C["Nhánh Cảnh Báo: Skip toàn bộ quy trình"]
-    B -- "File hợp lệ (4 trang)" --> D["VÒNG LẶP SONG SONG (.expand / .map)"]
+    B -- "Corrupted / 0 KB" --> C["Alert Branch: Skip Entire Pipeline"]
+    B -- "Valid File (4 Pages)" --> D["PARALLEL WORKFLOW (.expand / .map)"]
     
-    subgraph ParallelLoop ["Xử lý song song 4 Worker độc lập"]
-        D --> P1["Worker 1 (Trang 1)<br/>AI nhận diện VAT -> Bóc tách MST, Tiền thuế 55tr"]
-        D --> P2["Worker 2 (Trang 2)<br/>AI nhận diện EVN -> Bóc tách Mã PE, Tiền điện 1.85tr"]
-        D --> P3["Worker 3 (Trang 3)<br/>AI nhận diện Vé bay -> Bóc tách Mã NV, Vé 3.2tr"]
-        D --> P4["Worker 4 (Trang 4)<br/>AI nhận diện Biên lai -> Cảnh báo loại trừ thuế 150k"]
+    subgraph ParallelLoop ["Parallel Processing Across 4 Workers"]
+        D --> P1["Worker 1 (Page 1)<br/>AI Detects VAT Invoice -> Extract Tax ID, 55M VND"]
+        D --> P2["Worker 2 (Page 2)<br/>AI Detects Utility (EVN) -> Extract Cust ID, 1.85M VND"]
+        D --> P3["Worker 3 (Page 3)<br/>AI Detects Travel Expense -> Extract Emp ID, 3.2M VND"]
+        D --> P4["Worker 4 (Page 4)<br/>AI Detects Retail Receipt -> Non-deductible Tax Warning 150K"]
     end
     
-    P1 & P2 & P3 & P4 --> G[("Gom 4 kết quả sau bóc tách song song")]
+    P1 & P2 & P3 & P4 --> G[("Aggregate 4 Extracted Results")]
     
-    G --> H{"CHECK 2 & 3: Kiểm định Thuế & Ngân sách"}
+    G --> H{"CHECKS 2 & 3: Tax Math & Budget Compliance"}
     
-    H -- "PASS: Thuế khớp & Tổng chi phí 60.2tr <= 100tr" --> I[("CHỐT SỔ CÁI CHI PHÍ THÁNG (ERP / SAP)")]
-    H -- "FAIL: Sai thuế hoặc Vượt ngân sách 100tr" --> K["🚫 BLOCKED: Khóa Sổ Cái, Báo động Kế toán trưởng"]
+    H -- "PASS: Tax matches & Total 60.2M <= 100M" --> I[("FINALIZE MONTHLY EXPENSE LEDGER (ERP / SAP)")]
+    H -- "FAIL: Math mismatch OR Budget > 100M" --> K["🚫 BLOCKED: Lock Ledger & Trigger Critical Alert"]
+
+    style A fill:#1e293b,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style B fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style C fill:#450a0a,stroke:#f43f5e,stroke-width:2px,color:#fff
+    style D fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style ParallelLoop fill:#0a0e17,stroke:#3b82f6,stroke-width:2px,stroke-dasharray: 5 5,color:#fff
+    style G fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
+    style H fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style K fill:#450a0a,stroke:#ef4444,stroke-width:2px,color:#fff
+    style I fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ---

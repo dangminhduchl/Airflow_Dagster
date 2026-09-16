@@ -51,111 +51,155 @@
 
 ## 3. SO SÁNH TRỰC DIỆN CODE CÁC PATTERN TỪ STEP FUNCTIONS
 
-Hai mã nguồn mẫu thực tế đã được xây dựng và kiểm thử trong thư mục [airflow_demo](file:///home/ducdm3/Self_training/AirFlow_Dagster/airflow_demo) và [dagster_demo](file:///home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo).
+Hai mã nguồn mẫu thực tế đã được xây dựng và kiểm thử hoàn chỉnh trong thư mục [airflow_demo](file:///home/duc/SelftTraining/Airflow_Dagster/airflow_demo) và [dagster_demo](file:///home/duc/SelftTraining/Airflow_Dagster/dagster_demo) trên cùng bài toán: **Xử lý tệp PDF đa hóa đơn (`chung_tu_dau_vao_thang_3.pdf`)**.
 
-### 3.1. Rẽ nhánh có điều kiện (Choice State / If-Else)
+### 3.1. Rẽ nhánh kiểm tra file PDF (Choice State / File Integrity Check)
 
 #### Step Functions (ASL):
-Dùng `Choice` state kiểm tra biến JSON Path `$.Payload.is_active`.
+Dùng `Choice` state kiểm tra biến JSON Path `$.Payload.is_valid`.
 
 #### Apache Airflow:
 Dùng decorator `@task.branch`. Hàm trả về string chính là `task_id` của nhánh tiếp theo:
 ```python
 @task.branch
-def check_batch_condition(batch_info: dict) -> str:
-    if batch_info.get("is_active") and len(batch_info.get("orders", [])) > 0:
-        return "prepare_orders_for_mapping"  # Nhánh IF
-    return "handle_skipped_batch"            # Nhánh ELSE
+def check_pdf_integrity(pdf_data: Dict[str, Any]) -> str:
+    is_valid = pdf_data.get("is_valid", False)
+    pages = pdf_data.get("pages", [])
+    if is_valid and len(pages) > 0:
+        return "classify_invoice_pages"        # Nhánh hợp lệ
+    return "handle_corrupted_pdf_file"         # Nhánh file lỗi/rỗng
 ```
 
 #### Dagster:
-Dùng decorator `@op` với khai báo nhiều output tùy chọn (`is_required=False`):
+Dùng `@asset_check` kiểm định chất lượng dữ liệu hạng nhất:
 ```python
-@op(out={"process_branch": Out(is_required=False), "skip_branch": Out(is_required=False)})
-def check_batch_condition(orders: list, is_active: bool):
-    if is_active and len(orders) > 0:
-        yield Output(orders, output_name="process_branch")
-    else:
-        yield Output("Batch is empty or inactive", output_name="skip_branch")
+@asset_check(asset=raw_multipage_invoice_pdf, description="Check 1: File hợp lệ và số trang > 0")
+def check_pdf_file_integrity(raw_multipage_invoice_pdf: Dict[str, Any]) -> AssetCheckResult:
+    is_valid = raw_multipage_invoice_pdf.get("is_valid", False)
+    pages = raw_multipage_invoice_pdf.get("pages", [])
+    passed = is_valid and len(pages) > 0
+    return AssetCheckResult(passed=passed, metadata={"total_pages": len(pages)})
 ```
 
 > **Nhận xét:**
-> * Cả hai đều tự nhiên hơn nhiều so với cú pháp JSON dài dòng của Step Functions.
-> * Airflow liên kết bằng tên Task ID (chuỗi string), còn Dagster liên kết trực tiếp qua biến Python type-safe.
+> * Airflow liên kết bằng chuỗi string `task_id`. Nếu đổi tên task mà quên sửa chuỗi return, pipeline sẽ lỗi lúc runtime.
+> * Dagster tách hẳn việc kiểm tra tính toàn vẹn thành `@asset_check` độc lập, vừa hiển thị thẻ badge trực quan trên UI vừa lưu lịch sử kiểm định.
 
 ---
 
-### 3.2. Vòng lặp song song qua danh sách (Dynamic Map State / Loop)
+### 3.2. Vòng lặp bóc tách 4 loại hóa đơn song song (Dynamic Map State)
 
 #### Step Functions (ASL):
-Dùng `Map` state với `Iterator` hoặc Distributed Map.
+Dùng `Map` state với `Iterator` duyệt qua từng trang.
 
 #### Apache Airflow:
 Dùng **Dynamic Task Mapping** với toán tử `.expand()`:
 ```python
-# orders_list là list các phần tử sinh ra từ task trước
-# Airflow tự động nhân bản (fan-out) N instance task chạy song song
-mapped_orders = process_single_order.expand(order=orders_list)
+# 4 Hộp Task rẽ nhánh hiển thị rõ ràng trên Graph View UI:
+vat_mapped = extract_vat_invoice.expand(page=vat_pages)
+utility_mapped = extract_utility_invoice.expand(page=utility_pages)
+reimburse_mapped = extract_reimbursement_invoice.expand(page=reimburse_pages)
+invalid_mapped = extract_invalid_invoice.expand(page=invalid_pages)
 ```
 
 #### Dagster:
-Dùng **`DynamicOut` + `.map()`**:
+Tách thành 4 **Software-Defined Assets** chuyên biệt không cần if/else:
 ```python
-@op(out=DynamicOut())
-def fan_out_orders(orders: list):
-    for order in orders:
-        yield DynamicOutput(value=order, mapping_key=order["order_id"].replace("-", "_"))
+@asset(group_name="invoice_pipeline")
+def vat_invoices(extracted_invoice_pages): ...
 
-# Thực thi map trên từng dynamic output
-dynamic_orders = fan_out_orders(process_branch)
-processed = dynamic_orders.map(process_single_order)
+@asset(group_name="invoice_pipeline")
+def utility_invoices(extracted_invoice_pages): ...
+
+@asset(group_name="invoice_pipeline")
+def reimbursement_invoices(extracted_invoice_pages): ...
+
+@asset(group_name="invoice_pipeline")
+def invalid_invoices(extracted_invoice_pages): ...
 ```
 
 > **Nhận xét:**
-> * Cú pháp `.expand()` của Airflow ngắn gọn hơn.
-> * Cơ chế `DynamicOut` của Dagster cho phép đặt `mapping_key` rõ ràng để theo dõi từng task instance trên UI.
+> * Airflow sinh ra các mapped task instances trong từng hộp task trên Graph View.
+> * Dagster hiển thị trực quan 4 node Asset song song trên Asset Graph; Dagster Engine tự động phân bổ chạy song song đa tiến trình (Multiprocess) hoặc K8s Pods độc lập khi Materialize.
 
 ---
 
-### 3.3. Thu thập kết quả sau vòng lặp (Fan-in / Aggregation)
+### 3.3. Gom kết quả sau xử lý song song (Fan-in / Aggregation)
 
 #### Apache Airflow:
-Airflow tự động gom kết quả của các mapped task thành một list truyền vào task tiếp theo, nhưng cần lưu ý cấu hình `trigger_rule` khi có rẽ nhánh trước đó:
+Gom 4 nhánh bóc tách bằng `TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS` (để không bị lỗi khi nhánh nào đó có 0 trang bị skip):
 ```python
 @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-def aggregate_results(processed_orders: List[dict]):
-    total_revenue = sum(item["final_price"] for item in processed_orders)
-    return {"total": total_revenue}
+def collect_extracted_invoices(vat_res=None, utility_res=None, reimburse_res=None, invalid_res=None):
+    results = []
+    for chunk in [vat_res, utility_res, reimburse_res, invalid_res]:
+        if chunk: results.extend(chunk if isinstance(chunk, list) else [chunk])
+    return results
 ```
 
 #### Dagster:
-Dagster dùng hàm `.collect()` tường minh để gom các dynamic output lại thành 1 list:
+Gom kết quả hoàn toàn tự nhiên qua tham số hàm (Dependency Injection):
 ```python
-@op
-def aggregate_results(processed_orders: List[dict]):
-    total_revenue = sum(item["final_price"] for item in processed_orders)
-    return {"total": total_revenue}
-
-# Gọi gom kết quả trong Job:
-aggregate_results(processed.collect())
+@asset(group_name="invoice_pipeline")
+def categorized_invoices(
+    vat_invoices: List[Dict[str, Any]],
+    utility_invoices: List[Dict[str, Any]],
+    reimbursement_invoices: List[Dict[str, Any]],
+    invalid_invoices: List[Dict[str, Any]],
+) -> Output[List[Dict[str, Any]]]:
+    all_records = vat_invoices + utility_invoices + reimbursement_invoices + invalid_invoices
+    return Output(all_records, metadata={"total_invoices": len(all_records)})
 ```
 
 ---
 
-### 3.4. Cơ chế truyền dữ liệu & Trạng thái giữa các bước (State Passing)
+### 3.4. Kiểm định tài chính & Chốt chặn ngân sách (Quality Gates & Blocking)
 
-Đây là điểm khác biệt lớn nhất ảnh hưởng trực tiếp đến hiệu năng và tính ổn định:
+#### Apache Airflow:
+Dùng `@task.branch` kiểm tra điều kiện ngân sách. Nếu vi phạm, rẽ sang task cảnh báo và bỏ qua bước chốt sổ cái:
+```python
+@task.branch
+def audit_financial_budget_compliance(all_invoices: List[Dict[str, Any]]) -> str:
+    total_cost = sum(inv["total_amount"] for inv in all_invoices)
+    vat_invoices = [inv for inv in all_invoices if inv["category"] == "HOA_DON_VAT"]
+    vat_ok = all(inv["subtotal"] + inv["vat_amount"] == inv["total_amount"] for inv in vat_invoices)
+    
+    if total_cost <= 100_000_000 and vat_ok:
+        return "lock_and_publish_financial_ledger"  # PASS -> Chốt sổ
+    return "alert_financial_audit_violation"         # FAIL -> Báo động
+```
+
+#### Dagster:
+Dùng `@asset_check` với tham số **`blocking=True`** kết hợp Asset hạ nguồn:
+```python
+@asset_check(
+    asset=categorized_invoices,
+    blocking=True,
+    description="Check 3: Chặn đứng vi phạm ngân sách 100 triệu hoặc tiền âm",
+)
+def check_budget_limit_compliance(categorized_invoices: List[Dict[str, Any]]) -> AssetCheckResult:
+    total_cost = sum(inv.get("total_amount", 0) for inv in categorized_invoices)
+    passed = (total_cost <= 100_000_000) and all(inv.get("total_amount", 0) > 0 for inv in categorized_invoices)
+    return AssetCheckResult(passed=passed, metadata={"total_cost_vnd": total_cost})
+
+@asset(group_name="invoice_pipeline")
+def monthly_financial_expense_ledger(categorized_invoices):
+    # Chỉ được sinh ra khi Check 3 (blocking=True) đạt PASS 100%!
+    ...
+```
+
+---
+
+### 3.5. Cơ chế truyền dữ liệu giữa các bước (State Passing)
 
 | Đặc điểm | AWS Step Functions | Apache Airflow (XCom) | Dagster (IOManager) |
 | :--- | :--- | :--- | :--- |
 | **Dung lượng tối đa** | 256 KB (Bắt buộc đẩy S3 nếu lớn hơn) | Khuyên dùng < 48 KB (lưu trong DB) | **Không giới hạn** (Tùy storage backend) |
-| **Vị trí lưu trữ** | AWS State Engine | PostgreSQL Database (mặc định) | MinIO / S3 / Local Disk / Snowflake |
+| **Vị trí lưu trữ** | AWS State Engine | PostgreSQL Database (mặc định) | MinIO / S3 / Local Disk / Parquet |
 | **Cách lập trình** | JSON path: `$.Payload.data` | `ti.xcom_pull(...)` hoặc TaskFlow return | Return trực tiếp giá trị Python / DataFrame |
 | **Type-Safety** | Không | Không | **Có** (Kiểm tra kiểu dữ liệu đầu ra/vào) |
 
-> ⚠️ **Cảnh báo với Airflow:** Nếu truyền dữ liệu DataFrame Pandas hoặc danh sách hàng nghìn bản ghi qua XCom mặc định của Airflow, cơ sở dữ liệu PostgreSQL sẽ bị phình to và làm nghẽn Scheduler. Với Dagster, `IOManager` tự động ghi DataFrame ra Parquet trên MinIO và nạp lại ở bước sau mà developer không cần viết thêm dòng code upload/download nào.
-
----
+> ⚠️ **Cảnh báo với Airflow:** Khi truyền dữ liệu OCR, file nhị phân hoặc bảng kê hàng nghìn bản ghi qua XCom mặc định của Airflow, cơ sở dữ liệu PostgreSQL sẽ bị phình to (bloat) và làm nghẽn Scheduler. Với Dagster, `IOManager` tự động quản lý lưu trữ (Local Disk khi Dev, MinIO/S3 khi Production) mà lập trình viên không cần viết code upload/download.
 
 ---
 
@@ -168,25 +212,36 @@ Thời gian Feedback Loop khi sửa 1 dòng code:
 ┌───────────────────────────────┬─────────────────┐
 │ AWS Step Functions (Deploy)   │ 3 - 5 phút      │
 │ Apache Airflow (Docker/CLI)   │ 30 - 60 giây    │
-│ Dagster (pytest local)        │ 1 - 3 giây      │ ⚡ NHANH NHẤT
+│ Dagster (pytest local)        │ 1 - 2 giây      │ ⚡ NHANH NHẤT
 └───────────────────────────────┴─────────────────┘
 ```
 
 ### Tại sao Dagster vượt trội về Testing? (Bản chất kỹ thuật)
-Trong [test_order_processing.py](file:///home/ducdm3/Self_training/AirFlow_Dagster/dagster_demo/tests/test_order_processing.py), bạn có thể:
-1. **Test từng Op đơn lẻ như 1 hàm Python thuần túy:**
+Trong [test_invoice_processing.py](file:///home/duc/SelftTraining/Airflow_Dagster/dagster_demo/tests/test_invoice_processing.py), bạn có thể:
+1. **Test toàn bộ chuỗi Asset trong tiến trình (In-Process) không cần Database:**
    ```python
-   def test_single_order():
-       res = process_single_order({"order_id": "1", "amount": 1000})
-       assert res["tier"] == "VIP"
-   ```
-2. **Test toàn bộ Pipeline trong tiến trình (In-Process) không cần Database:**
-   ```python
-   def test_pipeline():
-       result = order_processing_job.execute_in_process()
+   def test_invoice_pipeline_materialization():
+       result = materialize([
+           raw_multipage_invoice_pdf,
+           extracted_invoice_pages,
+           vat_invoices,
+           utility_invoices,
+           reimbursement_invoices,
+           invalid_invoices,
+           categorized_invoices,
+           monthly_financial_expense_ledger,
+       ])
        assert result.success
+       assert len(result.get_asset_materialization_events()) == 8
    ```
-3. **Mock Resource & IOManager:** Dễ dàng thay thế kết nối Database thật bằng dữ liệu mẫu trong RAM khi chạy CI/CD.
+2. **Test độc lập từng Asset Check & Tính năng Blocking:**
+   ```python
+   def test_check_budget_limit_compliance_blocking():
+       overbudget = [{"total_amount": 120_000_000}]
+       fail_res = check_budget_limit_compliance(overbudget)
+       assert fail_res.passed is False
+   ```
+3. **Chạy test tự động siêu tốc:** Gõ lệnh `pytest` và nhận kết quả 4/4 test passed chỉ trong **1.3 giây**!
 
 ---
 
@@ -273,7 +328,7 @@ Trong [test_order_processing.py](file:///home/ducdm3/Self_training/AirFlow_Dagst
 
 * **Tại sao Dagster test được bằng Pytest trong 1.9 giây?**
   * Vì Dagster được xây dựng từ lõi như một **Thư viện tính toán đồ thị (Graph Execution Engine)** chứ không phải một dịch vụ daemon nguyên khối.
-  * Khi bạn gọi `order_processing_job.execute_in_process()` hoặc `materialize()` trong Pytest:
+  * Khi bạn gọi `materialize()` trong Pytest cho chuỗi Assets hóa đơn:
     - Dagster **KHÔNG CẦN** Webserver, không cần Daemon, không cần PostgreSQL, không cần gRPC server, không cần Docker.
     - Toàn bộ đồ thị được giải quyết trực tiếp trong RAM của tiến trình Pytest. `IOManager` mặc định lúc này là `mem_io_manager` (giữ data trong biến bộ nhớ) hoặc `fs_io_manager` (lưu file tạm trên đĩa cứng máy local).
     - Vì vậy, tốc độ test chính là tốc độ thực thi thuần túy của code Python bạn viết!
