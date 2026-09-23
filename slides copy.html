@@ -1538,48 +1538,48 @@
               <div
                 style="font-weight: 700; font-size: 13.5px; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
                 <span>⚙️ GÓC NHÌN AIRFLOW</span>
-                <span style="font-size: 11px; color: #94a3b8; font-weight: 400;">(Task-Centric)</span>
+                <span style="font-size: 11px; color: #94a3b8; font-weight: 400;">(Task-Centric - How to run)</span>
               </div>
               <div style="font-size: 11px; color: #cbd5e1; display: flex; gap: 8px;">
-                <span>• Làm gì tiếp?</span>
-                <span>• Trọng tâm Task</span>
+                <span>• 11 Task thực thi</span>
+                <span>• 2 @task.branch</span>
+                <span>• TriggerRule</span>
                 <span>• Mù dữ liệu</span>
-                <span>• XCom qua DB</span>
               </div>
             </div>
 
             <div class="slide-mermaid-box">
               <div class="mermaid">
                 graph TB
-                T1["📄 ingest_multipage_invoice_pdf<br /><i>Input: 4-Page PDF</i>"] --> T2{"⚙️
-                check_pdf_integrity<br /><i>@task.branch</i>"}
+                T1["📄 ingest_multipage_invoice_pdf<br /><i>(Input: 4-Page PDF)</i>"] --> T2{"⚙️ check_pdf_integrity<br /><i>(@task.branch - Check 1)</i>"}
 
-                T2 -- "Invalid / 0 KB" --> T_err["⚠️ handle_corrupted_file<br /><i>Hard Stop Pipeline</i>"]
-                T2 -- "Valid File" --> T_split["✂️ classify_invoice_pages<br /><i>Group 4 Types</i>"]
+                T2 -- "Lỗi / 0 KB" --> T_err["⚠️ handle_corrupted_pdf_file<br /><i>(Hard Stop Pipeline)</i>"] --> T_fin(["🏁 finish"])
+                T2 -- "Hợp lệ" --> T_split["✂️ classify_invoice_pages<br /><i>(Router 4 loại trang)</i>"]
 
-                T_split --> P1["⚡ extract_vat_invoice<br /><i>Cloud: 55M</i>"]
-                T_split --> P2["⚡ extract_utility_invoice<br /><i>EVN: 1.85M</i>"]
-                T_split --> P3["⚡ extract_reimbursement<br /><i>Flight: 3.2M</i>"]
-                T_split --> P4["⚡ extract_invalid_invoice<br /><i>Retail: 150K (⚠️)</i>"]
+                T_split --> P1["⚡ extract_vat_invoice<br /><i>(55M - VAT 5M)</i>"]
+                T_split --> P2["⚡ extract_utility_invoice<br /><i>(EVN: 1.85M)</i>"]
+                T_split --> P3["⚡ extract_reimbursement<br /><i>(Flight: 3.2M)</i>"]
+                T_split --> P4["⚡ extract_invalid_invoice<br /><i>(Retail: 150K ⚠️)</i>"]
 
-                P1 & P2 & P3 & P4 --> T4["📥 collect_extracted_invoices<br /><i>TriggerRule: NONE_FAILED...</i>"]
+                P1 & P2 & P3 & P4 --> T4["📥 collect_extracted_invoices<br /><i>(TriggerRule: NONE_FAILED...)</i>"]
 
-                T4 --> T5{"🔍 audit_budget_compliance<br /><i>Budget <= 100M</i>"}
-                    T5 -- "Pass: <= 100M" --> T6["✅ lock_publish_ledger<br /><i>Approved: 60.2M</i>"]
-                      T5 -- "Fail: > 100M" --> T7["❌ alert_audit_violation<br /><i>Skip Ledger</i>"]
+                T4 --> T5{"🔍 audit_financial_budget<br /><i>(@task.branch - Check 2 & 3)</i>"}
+                T5 -- "Pass: <= 100M" --> T6["✅ lock_publish_ledger<br /><i>(Approved: 60.2M -> SAP)</i>"] --> T_fin
+                T5 -- "Fail: > 100M" --> T7["❌ alert_audit_violation<br /><i>(Ngắt Sổ cái)</i>"] --> T_fin
 
-                      style T1 fill:#0f172a,stroke:#38bdf8,color:#f8fafc
-                      style T2 fill:#0f172a,stroke:#f59e0b,color:#f8fafc
-                      style T_err fill:#4c0519,stroke:#f43f5e,color:#f87171
-                      style T_split fill:#0f172a,stroke:#c084fc,color:#f8fafc
-                      style P1 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
-                      style P2 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
-                      style P3 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
-                      style P4 fill:#fff1f2,stroke:#f43f5e,color:#991b1b
-                      style T4 fill:#0f172a,stroke:#a855f7,color:#f8fafc
-                      style T5 fill:#0f172a,stroke:#f59e0b,color:#f8fafc
-                      style T6 fill:#064e3b,stroke:#22c55e,color:#4ade80
-                      style T7 fill:#4c0519,stroke:#f43f5e,color:#f87171
+                style T1 fill:#1e293b,stroke:#38bdf8,color:#f8fafc
+                style T2 fill:#451a03,stroke:#f59e0b,color:#fef08a
+                style T_err fill:#4c0519,stroke:#ef4444,color:#fca5a5
+                style T_split fill:#1e293b,stroke:#c084fc,color:#f8fafc
+                style P1 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
+                style P2 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
+                style P3 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
+                style P4 fill:#fff1f2,stroke:#f43f5e,color:#991b1b
+                style T4 fill:#3b0764,stroke:#a855f7,color:#f3e8ff
+                style T5 fill:#451a03,stroke:#f59e0b,color:#fef08a
+                style T6 fill:#064e3b,stroke:#22c55e,color:#4ade80
+                style T7 fill:#4c0519,stroke:#ef4444,color:#fca5a5
+                style T_fin fill:#334155,stroke:#64748b,color:#cbd5e1
               </div>
             </div>
           </div>
@@ -1592,12 +1592,12 @@
               <div
                 style="font-weight: 700; font-size: 13.5px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
                 <span>💎 GÓC NHÌN DAGSTER</span>
-                <span style="font-size: 11px; color: #94a3b8; font-weight: 400;">(Asset-Centric)</span>
+                <span style="font-size: 11px; color: #94a3b8; font-weight: 400;">(Asset-Centric - What to produce)</span>
               </div>
               <div style="font-size: 11px; color: #cbd5e1; display: flex; gap: 8px;">
-                <span>• Tạo tài sản gì?</span>
-                <span>• Software Assets</span>
-                <span>• Khiên Checks</span>
+                <span>• 100% Data Asset</span>
+                <span>• 3 Khiên @asset_check</span>
+                <span>• Blocking = True</span>
                 <span>• I/O Manager</span>
               </div>
             </div>
@@ -1605,36 +1605,35 @@
             <div class="slide-mermaid-box">
               <div class="mermaid">
                 graph TB
-                C1{{"🛡️ check_pdf_file_integrity"}}
-                A1[("📄 raw_multipage_invoice_pdf<br /><i>4-Page Input PDF</i>")]
-                A2[("📑 extracted_invoice_pages<br /><i>OCR & AI Parsing</i>")]
+                C1{{"🛡️ check_pdf_file_integrity<br /><i>(Check 1: File toàn vẹn)</i>"}}
+                A1[("📄 raw_multipage_invoice_pdf<br /><i>Input PDF 4 trang</i>")]
 
-                C1 -. "Attached to" .-> A1
-                A1 --> A2
+                C1 -. "Gắn bảo vệ" .-> A1
+                A1 ==>|"Tự nạp qua I/O Manager"| A2[("📑 extracted_invoice_pages<br /><i>Bóc tách OCR & AI Parser</i>")]
 
-                A2 --> V1[("⚡ vat_invoices<br /><i>Cloud: 55M (VAT 5M)</i>")]
-                A2 --> V2[("⚡ utility_invoices<br /><i>EVN Power: 1.85M</i>")]
-                A2 --> V3[("⚡ reimbursement_invoices<br /><i>Flight Ticket: 3.2M</i>")]
-                A2 --> V4[("⚡ invalid_invoices<br /><i>Retail: 150K (⚠️)</i>")]
+                A2 ==> V1[("⚡ vat_invoices<br /><i>55M (VAT 5M)</i>")]
+                A2 ==> V2[("⚡ utility_invoices<br /><i>EVN: 1.85M</i>")]
+                A2 ==> V3[("⚡ reimbursement_invoices<br /><i>Flight: 3.2M</i>")]
+                A2 ==> V4[("⚡ invalid_invoices<br /><i>Retail: 150K (⚠️)</i>")]
 
-                V1 & V2 & V3 & V4 --> A3[("📊 categorized_invoices<br /><i>Fan-In Convergence</i>")]
+                V1 & V2 & V3 & V4 ==> A3[("📊 categorized_invoices<br /><i>Tập hợp 4 hóa đơn: 60.2M</i>")]
 
-                C2{{"🛡️ check_vat_tax_math"}} -. "Attached to" .-> A3
-                C3{{"🛡️ check_budget_limit<br /><i>blocking=True (<= 100M)</i>"}} -. "Attached to" .-> A3
+                C2{{"🛡️ check_vat_tax_math<br /><i>(Check 2: Toán thuế VAT)</i>"}} -. "Gắn kiểm tra" .-> A3
+                C3{{"🛡️ check_budget_limit_compliance<br /><i>(Check 3: <= 100M | blocking=True ⛔)</i>"}} -. "Ngắt cầu dao" .-> A3
 
-                    A3 --> A4[("💎 monthly_expense_ledger<br /><i>Approved: 60.2M VND</i>")]
+                A3 ==>|"Chỉ sinh ra khi Check 3 = PASS"| A4[("💎 monthly_financial_expense_ledger<br /><i>Approved: 60.2M -> SAP ERP</i>")]
 
-                    style A1 fill:#1e1b4b,stroke:#818cf8,color:#e0e7ff
-                    style A2 fill:#1e1b4b,stroke:#818cf8,color:#e0e7ff
-                    style V1 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
-                    style V2 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
-                    style V3 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
-                    style V4 fill:#3b0764,stroke:#f43f5e,color:#fecdd3
-                    style A3 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
-                    style A4 fill:#064e3b,stroke:#22c55e,color:#4ade80
-                    style C1 fill:#0f172a,stroke:#38bdf8,color:#7dd3fc
-                    style C2 fill:#0f172a,stroke:#38bdf8,color:#7dd3fc
-                    style C3 fill:#4c0519,stroke:#ef4444,color:#fca5a5
+                style A1 fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#ffffff
+                style A2 fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#ffffff
+                style V1 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
+                style V2 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
+                style V3 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
+                style V4 fill:#3b0764,stroke:#f43f5e,color:#fecdd3
+                style A3 fill:#2e1065,stroke:#a855f7,stroke-width:2px,color:#ffffff
+                style A4 fill:#064e3b,stroke:#22c55e,stroke-width:3px,color:#ffffff
+                style C1 fill:#082f49,stroke:#38bdf8,color:#7dd3fc
+                style C2 fill:#082f49,stroke:#38bdf8,color:#7dd3fc
+                style C3 fill:#4c0519,stroke:#ef4444,stroke-width:2px,color:#fca5a5
               </div>
             </div>
           </div>
@@ -1643,11 +1642,9 @@
       </div>
 
       <div class="speaker-note-data" style="display:none;">
-        Trước khi bước vào màn hình Live Demo, chúng ta cần nắm rõ gốc rễ khác biệt lớn nhất giữa hai nền tảng:
-        - Bên trái (Airflow - Task-Centric): Chuỗi các hành động thực thi hình chữ nhật nối tiếp nhau, phải tự viết
-        nhánh rẽ và cấu hình TriggerRule khi gộp nhánh.
-        - Bên phải (Dagster - Asset-Centric): Chuỗi các tài sản dữ liệu sống hình trụ, đi kèm các chiếc khiên kiểm định
-        Asset Checks bảo vệ chất lượng dữ liệu và ngắt luồng tại chỗ nếu vượt trần 100M.
+        Đây là slide then chốt thể hiện sự khác biệt cốt lõi giữa hai triết lý thiết kế:
+        1. Bên trái (Airflow - Task-Centric): Đồ thị tập trung vào HÀNH ĐỘNG (Làm gì tiếp theo). Có tới 11 task, trong đó hơn 50% là plumbing code điều hướng luồng: 2 task rẽ nhánh @task.branch, 1 task cấu hình TriggerRule khi gom nhánh, và 2 task bắt lỗi. Airflow hoàn toàn 'mù dữ liệu', dữ liệu được giấu trong DB XCom.
+        2. Bên phải (Dagster - Asset-Centric): Đồ thị tập trung vào DỮ LIỆU CẦN TẠO RA. 100% các node là bảng dữ liệu thật (Software-Defined Assets). Tuyệt đối không cần task rẽ nhánh hay gộp nhánh. Kiểm định chất lượng là 3 chiếc khiên (@asset_check). Đặc biệt Check 3 có cờ blocking=True: nếu vi phạm ngân sách 100M, Dagster tự động ngắt cầu dao ngay tại chỗ, bảo vệ sổ cái ERP mà không cần viết task điều hướng.
       </div>
     </div>
 

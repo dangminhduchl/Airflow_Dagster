@@ -11,6 +11,7 @@ Key Design Highlights:
 - Mathematically balanced grids, symmetrical margins, and explicit text frame padding
 - 100% preservation of all content, Vietnamese text, metrics, and speaker notes
 """
+import os
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
@@ -616,7 +617,7 @@ def create_presentation():
     add_speaker_notes(s3, "Speaker Note: Giới thiệu bài toán nghiệp vụ bóc tách 4 trang hóa đơn và luồng kiểm toán tài chính. Chỉ rõ sơ đồ dòng chảy từ tiếp nhận đến duyệt hoặc dừng khẩn cấp.")
 
     # =========================================================================
-    # SLIDE 4: GÓC NHÌN AIRFLOW & DAGSTER (ALL SLEEK ROUNDED CARDS, ZERO CANS!)
+    # SLIDE 4: GÓC NHÌN AIRFLOW & DAGSTER (ACCURATE 1-TO-1 ARCHITECTURE COMPARISON)
     # =========================================================================
     s4 = prs.slides.add_slide(blank_layout)
     set_slide_background(s4)
@@ -630,177 +631,27 @@ def create_presentation():
     af_axis = left_af_x + (half_w / 2)
     dg_axis = right_dg_x + (half_w / 2)
 
-    # Left Container: Airflow Diagram Card
-    box_af_card = s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left_af_x, Inches(1.68), half_w, Inches(5.3))
-    box_af_card.fill.solid()
-    box_af_card.fill.fore_color.rgb = CARD_BG
-    box_af_card.line.color.rgb = ACCENT_CYAN
-    box_af_card.line.width = Pt(1.5)
+    # Auto-ensure 4K Mermaid Diagram is rendered if possible
+    mermaid_img = os.path.join(os.path.dirname(__file__), "mermaid_diagram_4k.png")
+    render_html = os.path.join(os.path.dirname(__file__), "render_mermaid_for_slide.html")
+    if not os.path.exists(mermaid_img) and os.path.exists(render_html):
+        import subprocess
+        try:
+            cmd = [
+                "google-chrome", "--headless=new", "--virtual-time-budget=4000",
+                "--window-size=2560,1350", "--force-device-scale-factor=2",
+                f"--screenshot={mermaid_img}", f"file://{render_html}"
+            ]
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
-    # Airflow Card Header Bar matching slides copy.html
-    h_af_box = s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left_af_x + Inches(0.12), Inches(1.76), half_w - Inches(0.24), Inches(0.32))
-    h_af_box.fill.solid()
-    h_af_box.fill.fore_color.rgb = RGBColor(12, 28, 48)
-    h_af_box.line.color.rgb = RGBColor(56, 189, 248)
-    h_af_box.line.width = Pt(1)
-    tf_haf = h_af_box.text_frame
-    tf_haf.vertical_anchor = MSO_ANCHOR.MIDDLE
-    p = tf_haf.paragraphs[0]
-    p.text = "⚙️ GÓC NHÌN AIRFLOW (Task-Centric)  |  Làm gì tiếp? • Mù dữ liệu • XCom qua DB"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(9.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_CYAN
-    p.alignment = PP_ALIGN.CENTER
+    use_4k_mermaid = os.path.exists(mermaid_img)
 
-    # Airflow Nodes
-    node_af_w = Inches(4.7)
-    add_node_card(s4, af_axis - (node_af_w / 2), Inches(2.16), node_af_w, Inches(0.42),
-                  "📄 ingest_multipage_invoice_pdf", "Input: 4-Page PDF",
-                  bg_color=CARD_BG_ALT, border_color=ACCENT_CYAN, title_size=10, sub_size=8.5)
+    # Full 16:9 Razor-Sharp 4K Mermaid Architecture Diagram (Airflow on top, Dagster on bottom)
+    s4.shapes.add_picture(mermaid_img, Inches(0.55), Inches(1.52), Inches(12.233), Inches(5.65))
 
-    add_arrow_down(s4, af_axis - Inches(0.2), Inches(2.58), text="↓", color=ACCENT_CYAN)
-
-    add_node_card(s4, af_axis - (node_af_w / 2), Inches(2.82), node_af_w, Inches(0.42),
-                  "⚙️ check_pdf_integrity", "@task.branch",
-                  bg_color=CARD_BG_ALT, border_color=ACCENT_AMBER, title_color=ACCENT_AMBER, title_size=10, sub_size=8.5)
-
-    add_arrow_label(s4, af_axis, Inches(3.24), "↓ Valid File", color=ACCENT_PURPLE, w=Inches(2.0))
-
-    add_node_card(s4, af_axis - (node_af_w / 2), Inches(3.48), node_af_w, Inches(0.42),
-                  "✂️ classify_invoice_pages", "Group 4 Types",
-                  bg_color=CARD_BG_ALT, border_color=BORDER_PURPLE, title_size=10, sub_size=8.5)
-
-    add_arrow_down(s4, af_axis - Inches(0.2), Inches(3.90), text="↓", color=ACCENT_CYAN)
-
-    # 4 Parallel Task Boxes
-    af_bw = Inches(1.15)
-    af_bgap = Inches(0.08)
-    af_total_w = (af_bw * 4) + (af_bgap * 3)
-    af_bx_start = af_axis - (af_total_w / 2)
-    af_by = Inches(4.14)
-    af_bh = Inches(0.68)
-
-    add_node_card(s4, af_bx_start, af_by, af_bw, af_bh,
-                  "⚡ VAT", "Cloud: 55M",
-                  bg_color=CARD_BG_ALT, border_color=ACCENT_CYAN, title_color=ACCENT_CYAN, title_size=9, sub_size=8)
-    add_node_card(s4, af_bx_start + (af_bw + af_bgap), af_by, af_bw, af_bh,
-                  "⚡ Utility", "EVN: 1.85M",
-                  bg_color=CARD_BG_ALT, border_color=ACCENT_CYAN, title_color=ACCENT_CYAN, title_size=9, sub_size=8)
-    add_node_card(s4, af_bx_start + (af_bw + af_bgap)*2, af_by, af_bw, af_bh,
-                  "⚡ Travel", "Flight: 3.2M",
-                  bg_color=CARD_BG_ALT, border_color=ACCENT_CYAN, title_color=ACCENT_CYAN, title_size=9, sub_size=8)
-    add_node_card(s4, af_bx_start + (af_bw + af_bgap)*3, af_by, af_bw, af_bh,
-                  "⚡ Retail (⚠️)", "Retail: 150K",
-                  bg_color=RGBColor(255, 241, 242), border_color=ACCENT_ROSE, title_color=RGBColor(153, 27, 27),
-                  sub_color=RGBColor(153, 27, 27), title_size=8.5, sub_size=7.5)
-
-    add_arrow_down(s4, af_axis - Inches(0.2), Inches(4.84), text="↓", color=ACCENT_CYAN)
-
-    # T4 Collect
-    add_node_card(s4, af_axis - (node_af_w / 2), Inches(5.08), node_af_w, Inches(0.42),
-                  "📥 collect_extracted_invoices", "TriggerRule: NONE_FAILED_MIN_ONE_SUCCESS",
-                  bg_color=CARD_BG_ALT, border_color=BORDER_PURPLE, title_size=9.5, sub_size=8)
-
-    add_arrow_down(s4, af_axis - Inches(0.2), Inches(5.50), text="↓", color=ACCENT_CYAN)
-
-    # T5 Outcomes
-    res_af_w = Inches(2.32)
-    res_af_gap = Inches(0.18)
-    res_af_start = af_axis - (res_af_w * 2 + res_af_gap) / 2
-    add_node_card(s4, res_af_start, Inches(5.74), res_af_w, Inches(0.68),
-                  "✅ lock_publish_ledger", "Pass <= 100M: 60.2M",
-                  bg_color=ACCENT_GREEN_BG, border_color=ACCENT_GREEN, title_color=RGBColor(74, 222, 128),
-                  sub_color=TEXT_MAIN, title_size=9.5, sub_size=8)
-
-    add_node_card(s4, res_af_start + res_af_w + res_af_gap, Inches(5.74), res_af_w, Inches(0.68),
-                  "❌ alert_audit_violation", "Fail > 100M: Skip Ledger",
-                  bg_color=ACCENT_ROSE_BG, border_color=ACCENT_ROSE, title_color=RGBColor(248, 113, 113),
-                  sub_color=TEXT_MAIN, title_size=9.5, sub_size=8)
-
-    # Right Container: Dagster Diagram Card
-    box_dg_card = s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, right_dg_x, Inches(1.68), half_w, Inches(5.3))
-    box_dg_card.fill.solid()
-    box_dg_card.fill.fore_color.rgb = CARD_BG
-    box_dg_card.line.color.rgb = ACCENT_PURPLE
-    box_dg_card.line.width = Pt(1.5)
-
-    # Dagster Card Header Bar matching slides copy.html
-    h_dg_box = s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, right_dg_x + Inches(0.12), Inches(1.76), half_w - Inches(0.24), Inches(0.32))
-    h_dg_box.fill.solid()
-    h_dg_box.fill.fore_color.rgb = RGBColor(32, 14, 52)
-    h_dg_box.line.color.rgb = RGBColor(192, 132, 252)
-    h_dg_box.line.width = Pt(1)
-    tf_hdg = h_dg_box.text_frame
-    tf_hdg.vertical_anchor = MSO_ANCHOR.MIDDLE
-    p = tf_hdg.paragraphs[0]
-    p.text = "💎 GÓC NHÌN DAGSTER (Asset-Centric)  |  Tạo tài sản gì? • Khiên Checks • I/O Manager"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(9.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_PURPLE
-    p.alignment = PP_ALIGN.CENTER
-
-    # Dagster Assets (REPLACED ALL UGLY CANS WITH SLEEK INDIGO/PURPLE ROUNDED CARDS!)
-    node_dg_w = Inches(4.8)
-    add_node_card(s4, dg_axis - (node_dg_w / 2), Inches(2.16), node_dg_w, Inches(0.42),
-                  "📄 raw_multipage_invoice_pdf", "🛡️ check_pdf_file_integrity",
-                  bg_color=DG_INDIGO, border_color=DG_INDIGO_BORDER,
-                  title_color=RGBColor(224, 231, 255), sub_color=ACCENT_CYAN, title_size=10, sub_size=8.5)
-
-    add_arrow_down(s4, dg_axis - Inches(0.2), Inches(2.58), text="↓", color=ACCENT_PURPLE)
-
-    add_node_card(s4, dg_axis - (node_dg_w / 2), Inches(2.82), node_dg_w, Inches(0.42),
-                  "📑 extracted_invoice_pages", "OCR & AI Parsing",
-                  bg_color=DG_INDIGO, border_color=DG_INDIGO_BORDER,
-                  title_color=RGBColor(224, 231, 255), sub_color=TEXT_MUTED, title_size=10, sub_size=8.5)
-
-    add_arrow_down(s4, dg_axis - Inches(0.2), Inches(3.24), text="↓", color=ACCENT_PURPLE)
-
-    # 4 Parallel Assets - Sleek Deep Purple Tech Cards (NO CANS!)
-    dg_bw = Inches(1.15)
-    dg_bgap = Inches(0.08)
-    dg_total_w = (dg_bw * 4) + (dg_bgap * 3)
-    dg_bx_start = dg_axis - (dg_total_w / 2)
-    dg_by = Inches(3.48)
-    dg_bh = Inches(0.70)
-
-    add_node_card(s4, dg_bx_start, dg_by, dg_bw, dg_bh,
-                  "⚡ vat_invoices", "55M (VAT 5M)",
-                  bg_color=DG_PURPLE_DEEP, border_color=DG_PURPLE_BORDER,
-                  title_color=RGBColor(243, 232, 255), title_size=8.5, sub_size=8)
-    add_node_card(s4, dg_bx_start + (dg_bw + dg_bgap), dg_by, dg_bw, dg_bh,
-                  "⚡ utility_inv", "EVN: 1.85M",
-                  bg_color=DG_PURPLE_DEEP, border_color=DG_PURPLE_BORDER,
-                  title_color=RGBColor(243, 232, 255), title_size=8.5, sub_size=8)
-    add_node_card(s4, dg_bx_start + (dg_bw + dg_bgap)*2, dg_by, dg_bw, dg_bh,
-                  "⚡ reimburse", "Flight: 3.2M",
-                  bg_color=DG_PURPLE_DEEP, border_color=DG_PURPLE_BORDER,
-                  title_color=RGBColor(243, 232, 255), title_size=8.5, sub_size=8)
-    add_node_card(s4, dg_bx_start + (dg_bw + dg_bgap)*3, dg_by, dg_bw, dg_bh,
-                  "⚡ invalid_inv", "Retail: 150K ⚠️",
-                  bg_color=DG_ROSE_DEEP, border_color=ACCENT_ROSE,
-                  title_color=RGBColor(254, 205, 211), title_size=8.5, sub_size=8)
-
-    add_arrow_label(s4, dg_axis, Inches(4.20), "↓ Fan-In Convergence", color=ACCENT_PURPLE, w=Inches(2.6))
-
-    # A3 Categorized Invoices with 2 Shields (SLEEK ROUNDED CARD!)
-    add_node_card(s4, dg_axis - (node_dg_w / 2), Inches(4.48), node_dg_w, Inches(0.55),
-                  "📊 categorized_invoices",
-                  "🛡️ check_vat_tax_math  |  🛡️ check_budget_limit (blocking=True)",
-                  bg_color=DG_PURPLE_DEEP, border_color=DG_PURPLE_BORDER,
-                  title_color=RGBColor(243, 232, 255), sub_color=ACCENT_AMBER, title_size=10, sub_size=8.5)
-
-    add_arrow_label(s4, dg_axis, Inches(5.06), "↓ Materialize", color=ACCENT_GREEN, w=Inches(2.0))
-
-    # A4 Ledger Asset (SLEEK RICH FOREST GREEN ROUNDED CARD!)
-    add_node_card(s4, dg_axis - (node_dg_w / 2), Inches(5.32), node_dg_w, Inches(0.60),
-                  "💎 monthly_expense_ledger",
-                  "Approved: 60.2M VND (Published to Storage & Dashboard)",
-                  bg_color=ACCENT_GREEN_BG, border_color=ACCENT_GREEN,
-                  title_color=RGBColor(74, 222, 128), sub_color=TEXT_MAIN, title_size=10.5, sub_size=8.5)
-
-    add_speaker_notes(s4, "Speaker Note: Phân tích sự khác biệt sâu sắc giữa 2 sơ đồ: Airflow quản lý chuỗi task hình chữ nhật và phải tự viết nhánh rẽ; Dagster quản lý chuỗi tài sản dữ liệu sống đi kèm các chiếc khiên kiểm định Asset Checks bảo vệ chất lượng dữ liệu.")
+    add_speaker_notes(s4, "Speaker Note: Phân tích sự khác biệt sâu sắc giữa 2 sơ đồ: Airflow quản lý chuỗi task hình chữ nhật và phải tự viết 2 lần @task.branch + TriggerRule khi gom nhánh; Dagster quản lý chuỗi tài sản dữ liệu sống đi kèm các chiếc khiên kiểm định Asset Checks độc lập, tự động ngắt cầu dao (blocking=True) bảo vệ sổ cái ERP.")
 
     # =========================================================================
     # SLIDE 5: 1 TASK TRONG AIRFLOW (ALL SLEEK ROUNDED CARDS, ZERO CANS!)

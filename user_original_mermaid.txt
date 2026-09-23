@@ -1,0 +1,142 @@
+<USER_REQUEST>
+flowchart TB
+%% =========================================================================
+%% CỘT TRÁI: APACHE AIRFLOW (TASK-CENTRIC - "HOW TO RUN")
+%% =========================================================================
+    subgraph AIRFLOW_SIDE ["⚙️ AIRFLOW: TASK-CENTRIC (ĐIỀU PHỐI TÁC VỤ)"]
+        direction TB
+
+        subgraph AF_NOTE ["📌 Đặc điểm kỹ thuật trong code"]
+            af_txt["• 11 Task thực thi + 2 lần rẽ nhánh @task.branch<br/>• Phải cấu hình TriggerRule khi gom nhánh<br/>• Dữ liệu ẩn bên trong XCom DB, Airflow chỉ biết Task Done/Fail"]
+        end
+
+        %% 1. Ingest & Check 1
+        T1["📄 ingest_multipage_invoice_pdf<br/><i>(Nạp file 4 trang)</i>"]
+        T2{"⚙️ check_pdf_integrity<br/><i>(@task.branch - Check 1)</i>"}
+        T_corrupt["⚠️ handle_corrupted_pdf_file<br/><i>(File hỏng -> Dừng luồng)</i>"]
+
+        %% 2. Router & 4 Mapped Tasks
+        T_router["✂️ classify_invoice_pages<br/><i>(Phân loại 4 nhóm)</i>"]
+        
+        subgraph AF_WORKERS ["4 Task Worker chạy song song (.expand)"]
+            direction LR
+            P1["⚡ extract_vat_invoice<br/><i>(55M - VAT 5M)</i>"]
+            P2["⚡ extract_utility_invoice<br/><i>(EVN: 1.85M)</i>"]
+            P3["⚡ extract_reimbursement<br/><i>(Flight: 3.2M)</i>"]
+            P4["⚡ extract_invalid_invoice<br/><i>(Retail: 150K ⚠️)</i>"]
+        end
+
+        %% 3. Gom kết quả (TriggerRule)
+        T_collect["📥 collect_extracted_invoices<br/><i>(TriggerRule: NONE_FAILED_MIN_ONE_SUCCESS)</i>"]
+
+        %% 4. Check 2 & 3 (Kiểm toán tài chính)
+        T_audit{"🔍 audit_financial_budget_compliance<br/><i>(@task.branch - Check 2 & 3)</i>"}
+        T_pass["✅ lock_and_publish_financial_ledger<br/><i>(Duyệt chi: 60.2M -> Đẩy SAP/ERP)</i>"]
+        T_alert["🚨 alert_financial_audit_violation<br/><i>(Vi phạm ngân sách > 100M)</i>"]
+        T_fin(["🏁 finish (EmptyOperator)"])
+
+        %% Kết nối Airflow
+        T1 --> T2
+        T2 -- "Lỗi / 0 KB" --> T_corrupt --> T_fin
+        T2 -- "Hợp lệ" --> T_router
+        T_router --> P1 & P2 & P3 & P4
+        P1 & P2 & P3 & P4 --> T_collect
+        T_collect --> T_audit
+        T_audit -- "Pass: <= 100M & Thuế đúng" --> T_pass --> T_fin
+        T_audit -- "Fail: > 100M hoặc Thuế sai" --> T_alert --> T_fin
+    end
+
+%% =========================================================================
+%% CỘT PHẢI: DAGSTER (ASSET-CENTRIC - "WHAT DATA TO PRODUCE")
+%% =========================================================================
+    subgraph DAGSTER_SIDE ["💎 DAGSTER: ASSET-CENTRIC (QUẢN LÝ DỮ LIỆU)"]
+        direction TB
+
+        subgraph DG_NOTE ["📌 Đặc điểm kỹ thuật trong code"]
+            dg_txt["• 100% Node là Bảng/File dữ liệu thật (Software-Defined Assets)<br/>• KHÔNG cần task rẽ nhánh, không cần cấu hình TriggerRule<br/>• Kiểm định chất lượng là CHIẾC KHIÊN (@asset_check) cắm vào Asset"]
+        end
+
+        %% 1. Asset 1 + Check 1
+        A1[("📄 raw_multipage_invoice_pdf<br/>━━━━━━━━━━━━━━━<br/>📊 4 pages • PDF File")]
+        C1{{"🛡️ check_pdf_file_integrity<br/><i>(Check 1: File toàn vẹn)</i>"}}
+
+        %% 2. Asset 2
+        A2[("📑 extracted_invoice_pages<br/>━━━━━━━━━━━━━━━<br/>🤖 OCR & Text Parsed")]
+
+        %% 3. 4 Asset chuyên biệt
+        subgraph DG_ASSETS ["4 Bảng Dữ Liệu Chuyên Biệt (Tự chạy song song)"]
+            direction LR
+            V1[("⚡ vat_invoices<br/><i>(55M - VAT 5M)</i>")]
+            V2[("⚡ utility_invoices<br/><i>(EVN: 1.85M)</i>")]
+            V3[("⚡ reimbursement_invoices<br/><i>(Flight: 3.2M)</i>")]
+            V4[("⚡ invalid_invoices<br/><i>(Retail: 150K ⚠️)</i>")]
+        end
+
+        %% 4. Asset Gom + 2 Chiếc khiên
+        A3[("📊 categorized_invoices<br/>━━━━━━━━━━━━━━━<br/>📦 Tổng 4 hóa đơn: 60.2M VND")]
+        C2{{"🛡️ check_vat_tax_math<br/><i>(Check 2: Toán thuế VAT)</i>"}}
+        C3{{"🛡️ check_budget_limit_compliance<br/><i>(Check 3: Trần 100M - BLOCKING ⛔)</i>"}}
+
+        %% 5. Asset đích
+        A4[("💎 monthly_financial_expense_ledger<br/>━━━━━━━━━━━━━━━<br/>🎯 Chốt sổ SAP/ERP (Approved 60.2M)")]
+
+        %% Kết nối Dagster (Lineage trong sáng)
+        C1 -. "Gắn bảo vệ" .-> A1
+        A1 ==>|"Tự động load qua I/O Manager"| A2
+        A2 ==> V1 & V2 & V3 & V4
+        V1 & V2 & V3 & V4 ==> A3
+        C2 -. "Gắn kiểm tra thuế" .-> A3
+        C3 -. "Gắn ngắt cầu dao" .-> A3
+        A3 ==>|"Chỉ sinh ra khi Check 3 = PASS"| A4
+    end
+
+%% =========================================================================
+%% STYLING TOÀN BỘ SƠ ĐỒ
+%% =========================================================================
+    %% Style khung
+    style AIRFLOW_SIDE fill:#081325,stroke:#38bdf8,stroke-width:2px,color:#93c5fd
+    style DAGSTER_SIDE fill:#140826,stroke:#c084fc,stroke-width:2px,color:#e9d5ff
+    style AF_NOTE fill:#0f224a,stroke:#60a5fa,color:#e0f2fe
+    style DG_NOTE fill:#280d4f,stroke:#c084fc,color:#fae8ff
+
+    %% Airflow Node Styles
+    style T1 fill:#1e293b,stroke:#94a3b8,color:#f8fafc
+    style T2 fill:#451a03,stroke:#f59e0b,color:#fef08a
+    style T_router fill:#1e293b,stroke:#94a3b8,color:#f8fafc
+    style P1 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
+    style P2 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
+    style P3 fill:#0f172a,stroke:#38bdf8,color:#38bdf8
+    style P4 fill:#fff1f2,stroke:#f43f5e,color:#991b1b
+    style T_collect fill:#3b0764,stroke:#a855f7,color:#f3e8ff
+    style T_audit fill:#451a03,stroke:#f59e0b,color:#fef08a
+    style T_pass fill:#064e3b,stroke:#22c55e,color:#86efac
+    style T_alert fill:#4c0519,stroke:#ef4444,color:#fca5a5
+    style T_corrupt fill:#4c0519,stroke:#ef4444,color:#fca5a5
+    style T_fin fill:#334155,stroke:#64748b,color:#cbd5e1
+
+    %% Dagster Node Styles
+    style A1 fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#ffffff
+    style A2 fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#ffffff
+    style V1 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
+    style V2 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
+    style V3 fill:#2e1065,stroke:#c084fc,color:#f3e8ff
+    style V4 fill:#3b0764,stroke:#f43f5e,color:#fecdd3
+    style A3 fill:#2e1065,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    style A4 fill:#064e3b,stroke:#22c55e,stroke-width:3px,color:#ffffff
+    style C1 fill:#082f49,stroke:#38bdf8,color:#7dd3fc
+    style C2 fill:#082f49,stroke:#38bdf8,color:#7dd3fc
+    style C3 fill:#4c0519,stroke:#ef4444,stroke-width:2px,color:#fca5a5
+
+
+cho aiflow bên trái , dagster bên phải đc ko, màu theo template của ảnh này 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-23T15:14:18+07:00.
+
+The user's current state is as follows:
+Active Document: /home/ducdm3/Self_training/AirFlow_Dagster/slides.html (LANGUAGE_HTML)
+Cursor is on line: 36
+Other open documents:
+- /home/ducdm3/Self_training/AirFlow_Dagster/slides.html (LANGUAGE_HTML)
+- /home/ducdm3/Self_training/AirFlow_Dagster/slides copy.html (LANGUAGE_HTML)
+</ADDITIONAL_METADATA>
