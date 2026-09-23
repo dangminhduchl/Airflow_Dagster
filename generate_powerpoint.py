@@ -73,12 +73,13 @@ def create_presentation():
         badge_w = min(max(Inches(len(badge_text) * 0.11 + 0.45), Inches(1.8)), Inches(3.6))
         if badge_text:
             badge_box = slide.shapes.add_shape(
-                MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(0.32), badge_w, Inches(0.32)
+                MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(0.32), badge_w, Inches(0.30)
             )
+            badge_box.adjustments[0] = 0.5  # Pill capsule
             badge_box.fill.solid()
             badge_box.fill.fore_color.rgb = CARD_BG
             badge_box.line.color.rgb = BORDER_PURPLE
-            badge_box.line.width = Pt(1.2)
+            badge_box.line.width = Pt(1.0)
             tf = badge_box.text_frame
             tf.word_wrap = False
             tf.vertical_anchor = MSO_ANCHOR.MIDDLE
@@ -90,7 +91,7 @@ def create_presentation():
             p.text = badge_text.upper()
             p.alignment = PP_ALIGN.CENTER
             p.font.name = FONT_MAIN
-            p.font.size = Pt(9.5)
+            p.font.size = Pt(8.5)
             p.font.bold = True
             p.font.color.rgb = ACCENT_PURPLE
 
@@ -118,15 +119,64 @@ def create_presentation():
             p2.font.color.rgb = ACCENT_CYAN
             p2.space_before = Pt(3)
 
-    def add_node_card(slide, x, y, w, h, title, subtitle="", bg_color=CARD_BG, border_color=BORDER_PURPLE,
+    def create_card(slide, x, y, w, h, border_color=BORDER_PURPLE, bg_color=CARD_BG, border_width=Pt(1.5), radius=0.05):
+        """Unified glassmorphic card container with consistent border and corner radius."""
+        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h)
+        card.fill.solid()
+        card.fill.fore_color.rgb = bg_color
+        card.line.color.rgb = border_color
+        card.line.width = border_width
+        card.adjustments[0] = radius
+        tf = card.text_frame
+        tf.word_wrap = True
+        tf.margin_left = Inches(0.28)
+        tf.margin_right = Inches(0.28)
+        tf.margin_top = Inches(0.24)
+        tf.margin_bottom = Inches(0.20)
+        return card
+
+    def add_card_header(card, title_text, title_color, size=Pt(16.5)):
+        """Standardized card title formatting."""
+        tf = card.text_frame
+        p = tf.paragraphs[0]
+        p.text = title_text
+        p.font.name = FONT_MAIN
+        p.font.size = size
+        p.font.bold = True
+        p.font.color.rgb = title_color
+        return p
+
+    def add_card_bullet(card, title, desc="", title_color=TEXT_MAIN, desc_color=TEXT_MUTED,
+                         title_size=Pt(11), desc_size=Pt(9.8), space_before=Pt(8)):
+        """Standardized card bullet item with title and description."""
+        tf = card.text_frame
+        pt = tf.add_paragraph()
+        pt.text = f"• {title}"
+        pt.font.name = FONT_MAIN
+        pt.font.bold = True
+        pt.font.size = title_size
+        pt.font.color.rgb = title_color
+        pt.space_before = space_before
+
+        if desc:
+            pd = tf.add_paragraph()
+            pd.text = desc
+            pd.font.name = FONT_MAIN
+            pd.font.size = desc_size
+            pd.font.color.rgb = desc_color
+            pd.space_before = Pt(2)
+        return pt
+
+    def add_node_card(slide, x, y, w, h, title, subtitle="", bg_color=CARD_BG_ALT, border_color=BORDER_PURPLE,
                       title_color=TEXT_MAIN, sub_color=TEXT_MUTED, title_size=10.5, sub_size=8.8,
-                      bold_title=True, border_width=1.2, align=PP_ALIGN.CENTER):
-        """Modern flat glassmorphic rounded card replacing all cans/ovals."""
+                      bold_title=True, border_width=1.0, align=PP_ALIGN.CENTER, radius=0.05):
+        """Unified inner step / flowchart node with standardized corner radius and border."""
         shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h)
         shape.fill.solid()
         shape.fill.fore_color.rgb = bg_color
         shape.line.color.rgb = border_color
         shape.line.width = Pt(border_width)
+        shape.adjustments[0] = radius
 
         tf = shape.text_frame
         tf.word_wrap = True
@@ -148,6 +198,7 @@ def create_presentation():
             p2 = tf.add_paragraph()
             p2.text = subtitle
             p2.font.name = FONT_MAIN
+            p2.font.bold = False
             p2.font.size = Pt(sub_size)
             p2.font.color.rgb = sub_color
             p2.alignment = align
@@ -203,29 +254,30 @@ def create_presentation():
     set_slide_background(s1)
 
     # Top badges matching header in slides copy.html
-    top_badge = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(3.8), Inches(0.55), Inches(5.733), Inches(0.38))
+    top_badge = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(3.8), Inches(0.40), Inches(5.733), Inches(0.32))
+    top_badge.adjustments[0] = 0.5  # Pill capsule
     top_badge.fill.solid()
     top_badge.fill.fore_color.rgb = CARD_BG
     top_badge.line.color.rgb = BORDER_SUBTLE
-    top_badge.line.width = Pt(1)
+    top_badge.line.width = Pt(1.0)
     tf_tb = top_badge.text_frame
     tf_tb.vertical_anchor = MSO_ANCHOR.MIDDLE
     p_tb = tf_tb.paragraphs[0]
     p_tb.text = "⚡ INVOICE PDF FLAGSHIP SCENARIO   |   🏢 ON-PREMISE / KUBERNETES"
     p_tb.font.name = FONT_MAIN
-    p_tb.font.size = Pt(10)
+    p_tb.font.size = Pt(9.5)
     p_tb.font.bold = True
     p_tb.font.color.rgb = ACCENT_CYAN
     p_tb.alignment = PP_ALIGN.CENTER
 
     # Main Presentation Title & Subtitle
-    title_box = s1.shapes.add_textbox(Inches(1.0), Inches(1.15), Inches(11.333), Inches(1.8))
+    title_box = s1.shapes.add_textbox(Inches(0.8), Inches(0.95), Inches(11.733), Inches(1.4))
     tf = title_box.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
     p.text = "SO SÁNH THỰC CHIẾN: AIRFLOW vs DAGSTER"
     p.font.name = FONT_MAIN
-    p.font.size = Pt(35)
+    p.font.size = Pt(32)
     p.font.bold = True
     p.font.color.rgb = TEXT_MAIN
     p.alignment = PP_ALIGN.CENTER
@@ -233,35 +285,26 @@ def create_presentation():
     p2 = tf.add_paragraph()
     p2.text = "Chuyên đề: Xử lý Hồ sơ Hóa đơn Đa trang (Invoice PDF Processing) & Chuyển dịch On-Premise"
     p2.font.name = FONT_MAIN
-    p2.font.size = Pt(16)
+    p2.font.size = Pt(14)
     p2.font.color.rgb = ACCENT_CYAN
     p2.alignment = PP_ALIGN.CENTER
-    p2.space_before = Pt(8)
+    p2.space_before = Pt(6)
 
-    # Arena Layout - Sleek Rounded Glass Cards (NO OVALS!)
-    card_w = Inches(4.75)
-    card_h = Inches(3.1)
-    card_y = Inches(3.2)
-    c_left_x = Inches(1.2)
-    c_right_x = Inches(7.383)
+    # Standard Two-Column Dimensions
+    col_w = Inches(5.65)
+    col_gap = Inches(0.433)
+    c1_x = Inches(0.8)
+    c2_x = c1_x + col_w + col_gap
+    cards_y = Inches(1.68)
+    cards_h = Inches(5.3)
 
     # Left Card: Airflow Brand
-    c_left = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c_left_x, card_y, card_w, card_h)
-    c_left.fill.solid()
-    c_left.fill.fore_color.rgb = CARD_BG
-    c_left.line.color.rgb = ACCENT_CYAN
-    c_left.line.width = Pt(1.8)
+    c_left = create_card(s1, c1_x, Inches(2.48), col_w, Inches(4.30), border_color=ACCENT_CYAN, border_width=Pt(1.5), radius=0.05)
     tf_l = c_left.text_frame
-    tf_l.word_wrap = True
-    tf_l.margin_left = Inches(0.28)
-    tf_l.margin_right = Inches(0.28)
-    tf_l.margin_top = Inches(0.22)
-    tf_l.margin_bottom = Inches(0.2)
-
     p = tf_l.paragraphs[0]
     p.text = "🌪️ APACHE AIRFLOW"
     p.font.name = FONT_MAIN
-    p.font.size = Pt(20)
+    p.font.size = Pt(18)
     p.font.bold = True
     p.font.color.rgb = ACCENT_CYAN
     p.alignment = PP_ALIGN.CENTER
@@ -284,20 +327,21 @@ def create_presentation():
         pb = tf_l.add_paragraph()
         pb.text = b
         pb.font.name = FONT_MAIN
-        pb.font.size = Pt(11.2)
+        pb.font.size = Pt(11)
         pb.font.color.rgb = TEXT_MUTED
-        pb.space_before = Pt(6)
+        pb.space_before = Pt(8)
 
-    # Center VS Badge: Modern Rounded Hex/Square Badge (NOT AN OVAL!)
-    vs_w = Inches(1.15)
-    vs_h = Inches(1.15)
+    # Center VS Badge: Modern Rounded Hex/Square Badge
+    vs_w = Inches(1.0)
+    vs_h = Inches(1.0)
     vs_x = (prs.slide_width - vs_w) / 2
     vs_y = Inches(4.15)
     vs_box = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, vs_x, vs_y, vs_w, vs_h)
+    vs_box.adjustments[0] = 0.15
     vs_box.fill.solid()
     vs_box.fill.fore_color.rgb = RGBColor(26, 16, 50)
     vs_box.line.color.rgb = ACCENT_PURPLE
-    vs_box.line.width = Pt(2.2)
+    vs_box.line.width = Pt(1.5)
     tf_vs = vs_box.text_frame
     tf_vs.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf_vs.paragraphs[0]
@@ -309,22 +353,12 @@ def create_presentation():
     p.alignment = PP_ALIGN.CENTER
 
     # Right Card: Dagster Brand
-    c_right = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c_right_x, card_y, card_w, card_h)
-    c_right.fill.solid()
-    c_right.fill.fore_color.rgb = CARD_BG
-    c_right.line.color.rgb = ACCENT_PURPLE
-    c_right.line.width = Pt(1.8)
+    c_right = create_card(s1, c2_x, Inches(2.48), col_w, Inches(4.30), border_color=ACCENT_PURPLE, border_width=Pt(1.5), radius=0.05)
     tf_r = c_right.text_frame
-    tf_r.word_wrap = True
-    tf_r.margin_left = Inches(0.28)
-    tf_r.margin_right = Inches(0.28)
-    tf_r.margin_top = Inches(0.22)
-    tf_r.margin_bottom = Inches(0.2)
-
     p = tf_r.paragraphs[0]
     p.text = "💎 DAGSTER"
     p.font.name = FONT_MAIN
-    p.font.size = Pt(20)
+    p.font.size = Pt(18)
     p.font.bold = True
     p.font.color.rgb = ACCENT_PURPLE
     p.alignment = PP_ALIGN.CENTER
@@ -347,22 +381,23 @@ def create_presentation():
         pb = tf_r.add_paragraph()
         pb.text = b
         pb.font.name = FONT_MAIN
-        pb.font.size = Pt(11.2)
+        pb.font.size = Pt(11)
         pb.font.color.rgb = TEXT_MUTED
-        pb.space_before = Pt(6)
+        pb.space_before = Pt(8)
 
     # Executive Footer
-    footer = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.8), Inches(6.58), Inches(9.733), Inches(0.48))
+    footer = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.8), Inches(6.92), Inches(9.733), Inches(0.40))
+    footer.adjustments[0] = 0.5
     footer.fill.solid()
     footer.fill.fore_color.rgb = CARD_BG
     footer.line.color.rgb = BORDER_SUBTLE
-    footer.line.width = Pt(1)
+    footer.line.width = Pt(1.0)
     tf_ft = footer.text_frame
     tf_ft.vertical_anchor = MSO_ANCHOR.MIDDLE
     ft_p = tf_ft.paragraphs[0]
     ft_p.text = "Khán giả: CTO, Solution Architect, Tech Lead, Data Platform Team   |   Thời lượng: 35-45 phút"
     ft_p.font.name = FONT_MAIN
-    ft_p.font.size = Pt(11)
+    ft_p.font.size = Pt(10.5)
     ft_p.font.color.rgb = TEXT_MUTED
     ft_p.alignment = PP_ALIGN.CENTER
 
@@ -376,32 +411,9 @@ def create_presentation():
     add_header(s2, "Hạ Tầng Cloud Hiện Tại", "AWS Step Functions & Thách Thức Chuyển Đổi",
                "Đánh giá hiện trạng hạ tầng Cloud hiện tại và động lực di chuyển On-Premise")
 
-    col_w = Inches(5.65)
-    col_gap = Inches(0.433)
-    c1_x = Inches(0.8)
-    c2_x = c1_x + col_w + col_gap
-    cards_y = Inches(1.68)
-    cards_h = Inches(5.3)
-
     # Pros Card
-    card_pros = s2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c1_x, cards_y, col_w, cards_h)
-    card_pros.fill.solid()
-    card_pros.fill.fore_color.rgb = CARD_BG
-    card_pros.line.color.rgb = ACCENT_GREEN
-    card_pros.line.width = Pt(1.5)
-    tf = card_pros.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.28)
-    tf.margin_right = Inches(0.28)
-    tf.margin_top = Inches(0.24)
-    tf.margin_bottom = Inches(0.2)
-
-    p = tf.paragraphs[0]
-    p.text = "✅ LỢI THẾ HIỆN TẠI (PROS)"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(16.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_GREEN
+    card_pros = create_card(s2, c1_x, cards_y, col_w, cards_h, border_color=ACCENT_GREEN, border_width=Pt(1.5), radius=0.05)
+    add_card_header(card_pros, "✅ LỢI THẾ HIỆN TẠI (PROS)", ACCENT_GREEN)
 
     for title, desc in [
         ("Hoàn toàn Serverless:", "Không tốn công vận hành hạ tầng máy chủ hay cụm cluster."),
@@ -409,40 +421,11 @@ def create_presentation():
         ("Pay-as-you-go:", "Chỉ trả phí dựa trên số lượng request và chuyển trạng thái thực tế."),
         ("Tích hợp sâu hệ sinh thái AWS:", "Kết nối trực tiếp Lambda, S3, DynamoDB, SQS mượt mà.")
     ]:
-        pt = tf.add_paragraph()
-        pt.text = f"• {title}"
-        pt.font.name = FONT_MAIN
-        pt.font.bold = True
-        pt.font.size = Pt(12)
-        pt.font.color.rgb = TEXT_MAIN
-        pt.space_before = Pt(11)
-
-        pd = tf.add_paragraph()
-        pd.text = desc
-        pd.font.name = FONT_MAIN
-        pd.font.size = Pt(10.5)
-        pd.font.color.rgb = TEXT_MUTED
-        pd.space_before = Pt(2)
+        add_card_bullet(card_pros, title, desc, title_size=Pt(11), desc_size=Pt(9.8), space_before=Pt(10))
 
     # Cons Card
-    card_cons = s2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c2_x, cards_y, col_w, cards_h)
-    card_cons.fill.solid()
-    card_cons.fill.fore_color.rgb = CARD_BG
-    card_cons.line.color.rgb = ACCENT_ROSE
-    card_cons.line.width = Pt(1.5)
-    tf = card_cons.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.28)
-    tf.margin_right = Inches(0.28)
-    tf.margin_top = Inches(0.24)
-    tf.margin_bottom = Inches(0.2)
-
-    p = tf.paragraphs[0]
-    p.text = "❌ HẠN CHẾ & RỦI RO (CONS)"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(16.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_ROSE
+    card_cons = create_card(s2, c2_x, cards_y, col_w, cards_h, border_color=ACCENT_ROSE, border_width=Pt(1.5), radius=0.05)
+    add_card_header(card_cons, "❌ HẠN CHẾ & RỦI RO (CONS)", ACCENT_ROSE)
 
     for title, desc in [
         ("Khó khăn khi Test & Debug Local:", "Mô phỏng Step Function ở local rất phức tạp, chu kỳ phản hồi phát triển chậm."),
@@ -450,20 +433,7 @@ def create_presentation():
         ("Rủi ro Vendor Lock-in:", "Bị ràng buộc mã nguồn vào dịch vụ AWS, khó chuyển sang Cloud khác."),
         ("Tuân thủ On-Premise & Bảo mật:", "Khách hàng tài chính/ngân hàng yêu cầu dữ liệu nhạy cảm phải xử lý nội bộ.")
     ]:
-        pt = tf.add_paragraph()
-        pt.text = f"• {title}"
-        pt.font.name = FONT_MAIN
-        pt.font.bold = True
-        pt.font.size = Pt(12)
-        pt.font.color.rgb = TEXT_MAIN
-        pt.space_before = Pt(11)
-
-        pd = tf.add_paragraph()
-        pd.text = desc
-        pd.font.name = FONT_MAIN
-        pd.font.size = Pt(10.5)
-        pd.font.color.rgb = TEXT_MUTED
-        pd.space_before = Pt(2)
+        add_card_bullet(card_cons, title, desc, title_size=Pt(11), desc_size=Pt(9.8), space_before=Pt(10))
 
     add_speaker_notes(s2, "Speaker Note: Nêu rõ bối cảnh các dự án trước đây dùng AWS Step Functions. Đặt câu hỏi chiến lược: Khi khách hàng yêu cầu On-Premise để bảo mật dữ liệu và tiết kiệm chi phí lâu dài, ta sẽ chọn công cụ nào?")
 
@@ -476,22 +446,12 @@ def create_presentation():
                "Nghiệp vụ 4 loại hóa đơn & Luồng kiểm toán tài chính (PDF -> Data)")
 
     # Left Column: Business Specs Card
-    card_left = s3.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.68), Inches(5.2), Inches(5.3))
-    card_left.fill.solid()
-    card_left.fill.fore_color.rgb = CARD_BG
-    card_left.line.color.rgb = BORDER_CYAN
-    card_left.line.width = Pt(1.5)
+    card_left = create_card(s3, c1_x, cards_y, col_w, cards_h, border_color=BORDER_CYAN, border_width=Pt(1.5), radius=0.05)
     tf = card_left.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.24)
-    tf.margin_right = Inches(0.24)
-    tf.margin_top = Inches(0.22)
-    tf.margin_bottom = Inches(0.18)
-
     p = tf.paragraphs[0]
     p.text = "📋 QUY TRÌNH NGHIỆP VỤ & KIỂM TOÁN"
     p.font.name = FONT_MAIN
-    p.font.size = Pt(14.5)
+    p.font.size = Pt(15)
     p.font.bold = True
     p.font.color.rgb = ACCENT_CYAN
 
@@ -517,7 +477,7 @@ def create_presentation():
         pt.text = sec_title
         pt.font.name = FONT_MAIN
         pt.font.bold = True
-        pt.font.size = Pt(11.5)
+        pt.font.size = Pt(11)
         pt.font.color.rgb = TEXT_MAIN
         pt.space_before = Pt(8)
 
@@ -525,27 +485,20 @@ def create_presentation():
             pb = tf.add_paragraph()
             pb.text = f"• {b}"
             pb.font.name = FONT_MAIN
-            pb.font.size = Pt(9.8)
+            pb.font.size = Pt(9.5)
             pb.font.color.rgb = TEXT_MUTED
             pb.space_before = Pt(2)
 
     # Right Column: Flowchart Card
-    fc_left = Inches(6.25)
-    fc_w = Inches(6.283)
-    fc_bg = s3.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, fc_left, Inches(1.68), fc_w, Inches(5.3))
-    fc_bg.fill.solid()
-    fc_bg.fill.fore_color.rgb = RGBColor(12, 10, 24)
-    fc_bg.line.color.rgb = BORDER_PURPLE
-    fc_bg.line.width = Pt(1.5)
-
-    fc_axis = fc_left + (fc_w / 2)
+    fc_bg = create_card(s3, c2_x, cards_y, col_w, cards_h, border_color=BORDER_PURPLE, border_width=Pt(1.5), radius=0.05)
+    fc_axis = c2_x + (col_w / 2)
 
     # Node 1: Input PDF (Modern Flat Rounded Pill)
-    n1_w = Inches(3.8)
+    n1_w = Inches(3.6)
     add_node_card(s3, fc_axis - (n1_w / 2), Inches(1.88), n1_w, Inches(0.44),
                   "📄 Input PDF (4 Pages)", "",
                   bg_color=RGBColor(241, 245, 249), border_color=RGBColor(148, 163, 184),
-                  title_color=RGBColor(15, 23, 42), title_size=11)
+                  title_color=RGBColor(15, 23, 42), title_size=11, radius=0.05)
 
     add_arrow_down(s3, fc_axis - Inches(0.2), Inches(2.34), text="↓", color=RGBColor(148, 163, 184))
 
@@ -553,13 +506,13 @@ def create_presentation():
     add_node_card(s3, fc_axis - (n1_w / 2), Inches(2.62), n1_w, Inches(0.44),
                   "✂️ Split Pages", "",
                   bg_color=RGBColor(241, 245, 249), border_color=RGBColor(148, 163, 184),
-                  title_color=RGBColor(15, 23, 42), title_size=11)
+                  title_color=RGBColor(15, 23, 42), title_size=11, radius=0.05)
 
     add_arrow_down(s3, fc_axis - Inches(0.2), Inches(3.08), text="↓", color=RGBColor(148, 163, 184))
 
     # Parallel 4 Branches
-    branch_w = Inches(1.38)
-    branch_gap = Inches(0.1)
+    branch_w = Inches(1.22)
+    branch_gap = Inches(0.08)
     branches_total = (branch_w * 4) + (branch_gap * 3)
     bx_start = fc_axis - (branches_total / 2)
     by = Inches(3.36)
@@ -568,51 +521,51 @@ def create_presentation():
     add_node_card(s3, bx_start, by, branch_w, bh,
                   "VAT Invoice –", "Tax ID, Net & VAT",
                   bg_color=RGBColor(248, 250, 252), border_color=ACCENT_CYAN,
-                  title_color=RGBColor(2, 132, 199), sub_color=RGBColor(15, 23, 42), title_size=9.5, sub_size=8.5)
+                  title_color=RGBColor(2, 132, 199), sub_color=RGBColor(15, 23, 42), title_size=9.2, sub_size=8.0, radius=0.05)
 
     add_node_card(s3, bx_start + (branch_w + branch_gap), by, branch_w, bh,
                   "Utility Invoice –", "Customer ID",
                   bg_color=RGBColor(248, 250, 252), border_color=ACCENT_CYAN,
-                  title_color=RGBColor(2, 132, 199), sub_color=RGBColor(15, 23, 42), title_size=9.5, sub_size=8.5)
+                  title_color=RGBColor(2, 132, 199), sub_color=RGBColor(15, 23, 42), title_size=9.2, sub_size=8.0, radius=0.05)
 
     add_node_card(s3, bx_start + (branch_w + branch_gap)*2, by, branch_w, bh,
                   "Travel Expense –", "Employee ID",
                   bg_color=RGBColor(248, 250, 252), border_color=ACCENT_CYAN,
-                  title_color=RGBColor(2, 132, 199), sub_color=RGBColor(15, 23, 42), title_size=9.5, sub_size=8.5)
+                  title_color=RGBColor(2, 132, 199), sub_color=RGBColor(15, 23, 42), title_size=9.2, sub_size=8.0, radius=0.05)
 
     add_node_card(s3, bx_start + (branch_w + branch_gap)*3, by, branch_w, bh,
                   "Retail Receipt –", "⚠️ Reject Tax Deduct",
                   bg_color=RGBColor(255, 241, 242), border_color=ACCENT_ROSE,
-                  title_color=RGBColor(190, 18, 60), sub_color=RGBColor(153, 27, 27), title_size=9.5, sub_size=8.5)
+                  title_color=RGBColor(190, 18, 60), sub_color=RGBColor(153, 27, 27), title_size=9.2, sub_size=8.0, radius=0.05)
 
     add_arrow_down(s3, fc_axis - Inches(0.2), Inches(4.33), text="↓", color=RGBColor(148, 163, 184))
 
     # Node 3: Validation Box
-    n3_w = Inches(5.5)
+    n3_w = Inches(5.12)
     add_node_card(s3, fc_axis - (n3_w / 2), Inches(4.62), n3_w, Inches(0.72),
                   "🔍 VALIDATION –",
                   "Math check: Net + VAT = Total?   |   Within budget: <= 100M VND?",
                   bg_color=RGBColor(254, 243, 199), border_color=ACCENT_AMBER,
                   title_color=RGBColor(120, 53, 15), sub_color=RGBColor(146, 64, 14),
-                  title_size=11, sub_size=9.5, bold_title=True)
+                  title_size=10.5, sub_size=9.0, bold_title=True, radius=0.05)
 
     add_arrow_down(s3, fc_axis - Inches(0.2), Inches(5.36), text="↓", color=RGBColor(148, 163, 184))
 
     # 2 Result Boxes: Pass & Fail
-    res_w = Inches(2.65)
-    res_gap = Inches(0.35)
+    res_w = Inches(2.45)
+    res_gap = Inches(0.22)
     res_start = fc_axis - (res_w * 2 + res_gap) / 2
     add_node_card(s3, res_start, Inches(5.64), res_w, Inches(0.98),
                   "✅ APPROVED (Pass)", "Write to Database / Ledger",
                   bg_color=RGBColor(220, 252, 231), border_color=ACCENT_GREEN,
                   title_color=RGBColor(20, 83, 45), sub_color=RGBColor(22, 101, 52),
-                  title_size=11, sub_size=9.5, bold_title=True)
+                  title_size=10.5, sub_size=9.0, bold_title=True, radius=0.05)
 
     add_node_card(s3, res_start + res_w + res_gap, Inches(5.64), res_w, Inches(0.98),
                   "❌ REJECTED (Fail)", "Hard Stop Pipeline!",
                   bg_color=RGBColor(254, 226, 226), border_color=ACCENT_ROSE,
                   title_color=RGBColor(153, 27, 27), sub_color=RGBColor(127, 29, 29),
-                  title_size=11, sub_size=9.5, bold_title=True)
+                  title_size=10.5, sub_size=9.0, bold_title=True, radius=0.05)
 
     add_speaker_notes(s3, "Speaker Note: Giới thiệu bài toán nghiệp vụ bóc tách 4 trang hóa đơn và luồng kiểm toán tài chính. Chỉ rõ sơ đồ dòng chảy từ tiếp nhận đến duyệt hoặc dừng khẩn cấp.")
 
@@ -624,55 +577,29 @@ def create_presentation():
     add_header(s4, "Triết Lý Cốt Lõi", "Đối Chiếu Kiến Trúc: Task-Centric vs Asset-Centric",
                "Chuỗi hành động thực thi (Airflow Tasks) vs Mạng lưới tài sản dữ liệu (Dagster Assets)")
 
-    half_w = Inches(5.65)
-    gap_half = Inches(0.433)
-    left_af_x = Inches(0.8)
-    right_dg_x = left_af_x + half_w + gap_half
-    af_axis = left_af_x + (half_w / 2)
-    dg_axis = right_dg_x + (half_w / 2)
-
-    # Auto-ensure 4K Mermaid Diagram is rendered if possible
     mermaid_img = os.path.join(os.path.dirname(__file__), "mermaid_diagram_4k.png")
-    render_html = os.path.join(os.path.dirname(__file__), "render_mermaid_for_slide.html")
-    if not os.path.exists(mermaid_img) and os.path.exists(render_html):
-        import subprocess
-        try:
-            cmd = [
-                "google-chrome", "--headless=new", "--virtual-time-budget=4000",
-                "--window-size=2560,1350", "--force-device-scale-factor=2",
-                f"--screenshot={mermaid_img}", f"file://{render_html}"
-            ]
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-
-    use_4k_mermaid = os.path.exists(mermaid_img)
-
-    # Full 16:9 Razor-Sharp 4K Mermaid Architecture Diagram (Airflow on top, Dagster on bottom)
-    s4.shapes.add_picture(mermaid_img, Inches(0.55), Inches(1.52), Inches(12.233), Inches(5.65))
+    # Perfectly aligned with standard content box: left=0.8", top=1.68", width=11.733", height=5.3"
+    s4.shapes.add_picture(mermaid_img, Inches(0.8), Inches(1.68), Inches(11.733), Inches(5.3))
 
     add_speaker_notes(s4, "Speaker Note: Phân tích sự khác biệt sâu sắc giữa 2 sơ đồ: Airflow quản lý chuỗi task hình chữ nhật và phải tự viết 2 lần @task.branch + TriggerRule khi gom nhánh; Dagster quản lý chuỗi tài sản dữ liệu sống đi kèm các chiếc khiên kiểm định Asset Checks độc lập, tự động ngắt cầu dao (blocking=True) bảo vệ sổ cái ERP.")
 
     # =========================================================================
-    # SLIDE 5: 1 TASK TRONG AIRFLOW (ALL SLEEK ROUNDED CARDS, ZERO CANS!)
+    # SLIDE 5: 1 TASK TRONG AIRFLOW (STANDARDIZED TEMPLATE MATCHING SLIDES 1, 2, 3)
     # =========================================================================
     s5 = prs.slides.add_slide(blank_layout)
     set_slide_background(s5)
     add_header(s5, "Deep Dive Airflow", "Vòng Đời Thực Thi 1 Task Trong Apache Airflow",
                "Chu trình thực thi 6 bước & Các điểm nghẽn kiến trúc (DAG Parsing Loop, DB Hits, XCom DB)")
 
-    af_step_card = s5.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.68), Inches(6.4), Inches(5.3))
-    af_step_card.fill.solid()
-    af_step_card.fill.fore_color.rgb = CARD_BG
-    af_step_card.line.color.rgb = ACCENT_CYAN
-    af_step_card.line.width = Pt(1.5)
+    # Left Container: Flowchart 6 Steps (col_w = 5.65, cards_h = 5.3)
+    af_step_card = create_card(s5, c1_x, cards_y, col_w, cards_h, border_color=ACCENT_CYAN, border_width=Pt(1.5), radius=0.05)
 
-    t_af_step = s5.shapes.add_textbox(Inches(1.0), Inches(1.75), Inches(6.0), Inches(0.32))
+    t_af_step = s5.shapes.add_textbox(c1_x + Inches(0.2), cards_y + Inches(0.12), col_w - Inches(0.4), Inches(0.34))
     tf = t_af_step.text_frame
-    tf.margin_left = 0
-    tf.margin_right = 0
-    tf.margin_top = 0
-    tf.margin_bottom = 0
+    tf.margin_left = Inches(0)
+    tf.margin_right = Inches(0)
+    tf.margin_top = Inches(0)
+    tf.margin_bottom = Inches(0)
     p = tf.paragraphs[0]
     p.text = "⚙️ AIRFLOW TASK EXECUTION (Chu Trình 6 Bước)"
     p.font.name = FONT_MAIN
@@ -680,7 +607,7 @@ def create_presentation():
     p.font.bold = True
     p.font.color.rgb = ACCENT_CYAN
 
-    # All rounded rectangle steps (NO CANS!)
+    # 6 rounded rectangle step nodes with down arrows
     af_steps = [
         ("📁 1. Write Code File", "(dags/invoice_dag.py)",
          RGBColor(30, 27, 75), RGBColor(129, 140, 248)),
@@ -696,25 +623,23 @@ def create_presentation():
          CARD_BG_ALT, ACCENT_AMBER),
     ]
 
-    sy = Inches(2.14)
-    step_w = Inches(5.9)
+    sy = cards_y + Inches(0.52)
+    step_w = col_w - Inches(0.4)
     step_h = Inches(0.48)
     step_gap = Inches(0.28)
-    af_axis_5 = Inches(0.8) + (Inches(6.4) / 2)
+    af_axis_5 = c1_x + (col_w / 2)
 
     for idx, (title, sub, bg, bcol) in enumerate(af_steps):
         add_node_card(s5, af_axis_5 - (step_w / 2), sy, step_w, step_h,
-                      title, sub, bg_color=bg, border_color=bcol, title_size=10, sub_size=8)
+                      title, sub, bg_color=bg, border_color=bcol, title_size=10, sub_size=8, radius=0.05)
         if idx < len(af_steps) - 1:
             add_arrow_down(s5, af_axis_5 - Inches(0.2), sy + step_h + Inches(0.02), text="↓", color=ACCENT_CYAN)
         sy += (step_h + step_gap)
 
     # Right Container: 4 Step-by-Step Analysis Cards
-    rx = Inches(7.55)
-    rw = Inches(4.983)
-    ry = Inches(1.68)
-    rh = Inches(1.20)
-    rgap = Inches(0.16)
+    rw = col_w
+    rh = Inches(1.18)
+    rgap = Inches(0.19)
 
     af_cards_data = [
         ("🔄 1. Bị Ép Re-Parse Liên Tục (30s/lần)", ACCENT_AMBER,
@@ -728,15 +653,10 @@ def create_presentation():
     ]
 
     for idx, (ctitle, ccolor, cdesc) in enumerate(af_cards_data):
-        card = s5.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, rx, ry + (rh + rgap)*idx, rw, rh)
-        card.fill.solid()
-        card.fill.fore_color.rgb = CARD_BG_ALT
-        card.line.color.rgb = ccolor
-        card.line.width = Pt(1.2)
+        card = create_card(s5, c2_x, cards_y + (rh + rgap)*idx, rw, rh, border_color=ccolor, bg_color=CARD_BG, border_width=Pt(1.5), radius=0.05)
         tf = card.text_frame
-        tf.word_wrap = True
-        tf.margin_left = Inches(0.2)
-        tf.margin_right = Inches(0.2)
+        tf.margin_left = Inches(0.24)
+        tf.margin_right = Inches(0.24)
         tf.margin_top = Inches(0.12)
         tf.margin_bottom = Inches(0.1)
 
@@ -757,25 +677,21 @@ def create_presentation():
     add_speaker_notes(s5, "Speaker Note: Mổ xẻ 6 bước thực thi trong 1 task Airflow và 4 điểm nghẽn: CPU parsing loop, database lock do state machine, xcom phình to DB và UI bị mù dữ liệu.")
 
     # =========================================================================
-    # SLIDE 6: TRONG DAGSTER (ALL SLEEK ROUNDED CARDS, ZERO CANS!)
+    # SLIDE 6: TRONG DAGSTER (STANDARDIZED TEMPLATE MATCHING SLIDES 1, 2, 3)
     # =========================================================================
     s6 = prs.slides.add_slide(blank_layout)
     set_slide_background(s6)
     add_header(s6, "Deep Dive Dagster", "Kiến Trúc Điều Phối Hiện Đại Trong Dagster",
                "Chu trình phân tách 6 bước (gRPC Code Server, Ephemeral Worker, I/O Manager, Khiên Asset Checks)")
 
-    dg_step_card = s6.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.68), Inches(6.4), Inches(5.3))
-    dg_step_card.fill.solid()
-    dg_step_card.fill.fore_color.rgb = CARD_BG
-    dg_step_card.line.color.rgb = ACCENT_PURPLE
-    dg_step_card.line.width = Pt(1.5)
+    dg_step_card = create_card(s6, c1_x, cards_y, col_w, cards_h, border_color=ACCENT_PURPLE, border_width=Pt(1.5), radius=0.05)
 
-    t_dg_step = s6.shapes.add_textbox(Inches(1.0), Inches(1.75), Inches(6.0), Inches(0.32))
+    t_dg_step = s6.shapes.add_textbox(c1_x + Inches(0.2), cards_y + Inches(0.12), col_w - Inches(0.4), Inches(0.34))
     tf = t_dg_step.text_frame
-    tf.margin_left = 0
-    tf.margin_right = 0
-    tf.margin_top = 0
-    tf.margin_bottom = 0
+    tf.margin_left = Inches(0)
+    tf.margin_right = Inches(0)
+    tf.margin_top = Inches(0)
+    tf.margin_bottom = Inches(0)
     p = tf.paragraphs[0]
     p.text = "💎 DAGSTER ASSET MATERIALIZATION (Chu Trình Phân Tách)"
     p.font.name = FONT_MAIN
@@ -783,7 +699,6 @@ def create_presentation():
     p.font.bold = True
     p.font.color.rgb = ACCENT_PURPLE
 
-    # All rounded rectangle steps (NO CANS!)
     dg_steps = [
         ("📦 1. User Code Server (Isolated Process)", "assets.py với các hàm pure Python trong môi trường độc lập",
          RGBColor(30, 27, 75), RGBColor(129, 140, 248)),
@@ -799,17 +714,16 @@ def create_presentation():
          RGBColor(46, 16, 101), ACCENT_PURPLE),
     ]
 
-    sy = Inches(2.14)
-    dg_axis_6 = Inches(0.8) + (Inches(6.4) / 2)
+    sy = cards_y + Inches(0.52)
+    dg_axis_6 = c1_x + (col_w / 2)
 
     for idx, (title, sub, bg, bcol) in enumerate(dg_steps):
         add_node_card(s6, dg_axis_6 - (step_w / 2), sy, step_w, step_h,
-                      title, sub, bg_color=bg, border_color=bcol, title_size=10, sub_size=8)
+                      title, sub, bg_color=bg, border_color=bcol, title_size=10, sub_size=8, radius=0.05)
         if idx < len(dg_steps) - 1:
             add_arrow_down(s6, dg_axis_6 - Inches(0.2), sy + step_h + Inches(0.02), text="↓", color=ACCENT_PURPLE)
         sy += (step_h + step_gap)
 
-    # Right Container: 4 Step-by-Step Analysis Cards
     dg_cards_data = [
         ("🛡️ 1. Khám Phá Metadata Qua gRPC (Zero Load)", RGBColor(129, 140, 248),
          "Code người dùng chạy trong tiến trình riêng. Nền tảng chỉ dùng gRPC để hỏi schema và lineage, hoàn toàn không nạp code Python của user vào Scheduler."),
@@ -822,15 +736,10 @@ def create_presentation():
     ]
 
     for idx, (ctitle, ccolor, cdesc) in enumerate(dg_cards_data):
-        card = s6.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, rx, ry + (rh + rgap)*idx, rw, rh)
-        card.fill.solid()
-        card.fill.fore_color.rgb = CARD_BG_ALT
-        card.line.color.rgb = ccolor
-        card.line.width = Pt(1.2)
+        card = create_card(s6, c2_x, cards_y + (rh + rgap)*idx, rw, rh, border_color=ccolor, bg_color=CARD_BG, border_width=Pt(1.5), radius=0.05)
         tf = card.text_frame
-        tf.word_wrap = True
-        tf.margin_left = Inches(0.2)
-        tf.margin_right = Inches(0.2)
+        tf.margin_left = Inches(0.24)
+        tf.margin_right = Inches(0.24)
         tf.margin_top = Inches(0.12)
         tf.margin_bottom = Inches(0.1)
 
@@ -851,93 +760,38 @@ def create_presentation():
     add_speaker_notes(s6, "Speaker Note: Giới thiệu 4 ưu điểm vượt trội trong kiến trúc Dagster: gRPC code server cách ly mã nguồn, ephemeral worker tự dọn dẹp, I/O manager tách biệt storage và Asset Checks bảo vệ dữ liệu.")
 
     # =========================================================================
-    # SLIDE 7: HẠ TẦNG ON-PREMISE & CI/CD
+    # SLIDE 7: HẠ TẦNG ON-PREMISE & CI/CD (STANDARDIZED TEMPLATE MATCHING SLIDES 1, 2, 3)
     # =========================================================================
     s7 = prs.slides.add_slide(blank_layout)
     set_slide_background(s7)
     add_header(s7, "Triển Khai & Vận Hành", "Hạ Tầng On-Premise & Năng Lực Kiểm Thử CI/CD",
                "Kiến trúc cụm On-Prem (Kubernetes, MinIO, PostgreSQL) và Tốc độ kiểm thử tự động")
 
-    c_infra = s7.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c1_x, cards_y, col_w, cards_h)
-    c_infra.fill.solid()
-    c_infra.fill.fore_color.rgb = CARD_BG
-    c_infra.line.color.rgb = ACCENT_CYAN
-    c_infra.line.width = Pt(1.5)
-    tf = c_infra.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.28)
-    tf.margin_right = Inches(0.28)
-    tf.margin_top = Inches(0.24)
-    tf.margin_bottom = Inches(0.2)
-
-    p = tf.paragraphs[0]
-    p.text = "🏢 HẠ TẦNG ON-PREMISE (K8S & STORAGE)"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(16.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_CYAN
+    # Left: Infrastructure On-Premise (Airflow vs Dagster Stack)
+    c_infra = create_card(s7, c1_x, cards_y, col_w, cards_h, border_color=ACCENT_CYAN, border_width=Pt(1.5), radius=0.05)
+    add_card_header(c_infra, "🏢 HẠ TẦNG ON-PREMISE (K8S & STORAGE)", ACCENT_CYAN)
 
     for t_i, d_i in [
-        ("Kubernetes Cluster:", "Triển khai điều phối bằng Helm Charts chính thức của Airflow / Dagster."),
-        ("MinIO (Object Storage S3-Compatible):", "Thay thế hoàn hảo AWS S3 để lưu trữ file PDF hóa đơn và artifacts."),
-        ("PostgreSQL HA:", "Lưu trữ metadata của hệ thống với cụm replica độ tin cậy cao."),
-        ("Vault & Keycloak:", "Quản lý secret và xác thực bảo mật tập trung cho toàn bộ dịch vụ.")
+        ("Kubernetes Cluster & Helm Charts:", "Triển khai điều phối bằng Helm Charts chính thức của Airflow / Dagster trên hạ tầng K8s."),
+        ("MinIO (Object Storage S3-Compatible):", "Thay thế hoàn hảo AWS S3 để lưu trữ file PDF hóa đơn và artifacts, I/O Manager tự động đẩy/kéo."),
+        ("PostgreSQL HA Cụm Replica:", "Lưu trữ metadata hệ thống với cụm replica tin cậy cao (Dagster chỉ lưu event log nhẹ)."),
+        ("Vault, Keycloak & Bảo Mật:", "Quản lý secret và xác thực bảo mật tập trung cho toàn bộ dịch vụ On-Premise."),
+        ("Code Location Pods Độc Lập:", "Dagster đóng gói Docker riêng, gọi gRPC cách ly mã nguồn, tự do dùng đa phiên bản Python.")
     ]:
-        pt = tf.add_paragraph()
-        pt.text = f"• {t_i}"
-        pt.font.name = FONT_MAIN
-        pt.font.bold = True
-        pt.font.size = Pt(12)
-        pt.font.color.rgb = TEXT_MAIN
-        pt.space_before = Pt(11)
+        add_card_bullet(c_infra, t_i, d_i, title_size=Pt(11), desc_size=Pt(9.8), space_before=Pt(8))
 
-        pd = tf.add_paragraph()
-        pd.text = d_i
-        pd.font.name = FONT_MAIN
-        pd.font.size = Pt(10.5)
-        pd.font.color.rgb = TEXT_MUTED
-        pd.space_before = Pt(2)
-
-    # Right: CI/CD Testing Comparison
-    c_test = s7.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c2_x, cards_y, col_w, cards_h)
-    c_test.fill.solid()
-    c_test.fill.fore_color.rgb = CARD_BG
-    c_test.line.color.rgb = ACCENT_GREEN
-    c_test.line.width = Pt(1.5)
-    tf = c_test.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.28)
-    tf.margin_right = Inches(0.28)
-    tf.margin_top = Inches(0.24)
-    tf.margin_bottom = Inches(0.2)
-
-    p = tf.paragraphs[0]
-    p.text = "⚡ TỐC ĐỘ KIỂM THỬ CI/CD & DEVELOPER UX"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(16.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_GREEN
+    # Right: CI/CD Testing Comparison & Developer UX
+    c_test = create_card(s7, c2_x, cards_y, col_w, cards_h, border_color=ACCENT_PURPLE, border_width=Pt(1.5), radius=0.05)
+    add_card_header(c_test, "⚡ TỐC ĐỘ KIỂM THỬ CI/CD & DEVELOPER UX", ACCENT_PURPLE)
 
     for t_i, d_i in [
-        ("Airflow Unit Test (Phức tạp, 5-15 giây):", "Cần khởi tạo SQLite database giả lập, mock context và task instance. Chạy chậm trong CI."),
-        ("Dagster In-Memory Test (Cực nhanh, ~0.12 giây):", "Hỗ trợ materialize([asset_name]) trực tiếp trong RAM, không cần database hay server. Tích hợp trơn tru vào Pytest."),
-        ("Tự tin Refactor:", "Kỹ sư tự do thay đổi logic xử lý hóa đơn và kiểm tra ngay lập tức tại máy cá nhân."),
-        ("Tối ưu chu kỳ phản hồi:", "Rút ngắn thời gian phát hiện lỗi từ hàng phút xuống chỉ vài trăm mili-giây.")
+        ("Airflow Unit Test (Phức tạp, 3-5 phút):", "Cần khởi tạo SQLite/Postgres giả lập, mock context và task instance. Chạy chậm trong CI/CD."),
+        ("Dagster In-Memory Test (Siêu tốc, 0.12 giây):", "Hỗ trợ materialize([asset_name]) trực tiếp trong RAM, không cần database hay server."),
+        ("Tự Động Hóa Kiểm Thử CI/CD:", "Tích hợp mượt mà pytest vào GitLab CI / GitHub Actions trên từng PR trước khi merge."),
+        ("Bảo Vệ Chất Lượng Dữ Liệu:", "@asset_check(blocking=True) ngắt luồng tại chỗ trong 0.02s nếu hóa đơn vượt ngân sách 100M."),
+        ("Tự Tin Refactor & DevX Vượt Trội:", "Kỹ sư tự do thay đổi logic hóa đơn và kiểm tra ngay tức thì tại máy cá nhân.")
     ]:
-        pt = tf.add_paragraph()
-        pt.text = f"• {t_i}"
-        pt.font.name = FONT_MAIN
-        pt.font.bold = True
-        pt.font.size = Pt(12)
-        pt.font.color.rgb = TEXT_MAIN
-        pt.space_before = Pt(11)
-
-        pd = tf.add_paragraph()
-        pd.text = d_i
-        pd.font.name = FONT_MAIN
-        pd.font.size = Pt(10.5)
-        pd.font.color.rgb = TEXT_MUTED
-        pd.space_before = Pt(2)
+        add_card_bullet(c_test, t_i, d_i, title_size=Pt(11), desc_size=Pt(9.8), space_before=Pt(8))
 
     add_speaker_notes(s7, "Speaker Note: Giới thiệu mô hình hạ tầng On-Premise chuẩn doanh nghiệp và so sánh trải nghiệm developer: Dagster vượt trội nhờ khả năng test in-memory 0.12s.")
 
@@ -951,9 +805,9 @@ def create_presentation():
 
     rows, cols = 8, 4
     table_left = Inches(0.8)
-    table_top = Inches(1.72)
+    table_top = Inches(1.68)
     table_w = Inches(11.733)
-    table_h = Inches(5.2)
+    table_h = Inches(5.3)
     table_shape = s8.shapes.add_table(rows, cols, table_left, table_top, table_w, table_h)
     table = table_shape.table
     table.columns[0].width = Inches(2.3)
@@ -1030,24 +884,8 @@ def create_presentation():
     add_header(s9, "Định Vị Giải Pháp", "Định Vị Giải Pháp: Tiêu Chí Lựa Chọn Airflow vs Dagster",
                "Căn cứ lựa chọn công nghệ phù hợp với đặc thù dự án và bài toán của doanh nghiệp")
 
-    box_when_af = s9.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c1_x, cards_y, col_w, cards_h)
-    box_when_af.fill.solid()
-    box_when_af.fill.fore_color.rgb = CARD_BG
-    box_when_af.line.color.rgb = ACCENT_CYAN
-    box_when_af.line.width = Pt(1.5)
-    tf = box_when_af.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.28)
-    tf.margin_right = Inches(0.28)
-    tf.margin_top = Inches(0.24)
-    tf.margin_bottom = Inches(0.2)
-
-    p = tf.paragraphs[0]
-    p.text = "🎯 NÊN CHỌN AIRFLOW KHI:"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(16.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_CYAN
+    box_when_af = create_card(s9, c1_x, cards_y, col_w, cards_h, border_color=ACCENT_CYAN, border_width=Pt(1.5), radius=0.05)
+    add_card_header(box_when_af, "🎯 NÊN CHỌN AIRFLOW KHI:", ACCENT_CYAN)
 
     for w_t, w_d in [
         ("Team đã có kinh nghiệm Airflow dày dặn:", "Tận dụng hạ tầng, kỹ năng và quy trình DevOps sẵn có."),
@@ -1056,39 +894,10 @@ def create_presentation():
         ("Ít quan tâm đến Data Lineage & Asset Quality:", "Quy trình ETL đơn giản, chuyển dữ liệu từ A sang B định kỳ."),
         ("Cần sự ổn định lâu dài:", "Thư viện plugin phong phú hỗ trợ gần như mọi dịch vụ công nghệ trên thị trường.")
     ]:
-        pt = tf.add_paragraph()
-        pt.text = f"• {w_t}"
-        pt.font.name = FONT_MAIN
-        pt.font.bold = True
-        pt.font.size = Pt(11)
-        pt.font.color.rgb = TEXT_MAIN
-        pt.space_before = Pt(8)
+        add_card_bullet(box_when_af, w_t, w_d, title_size=Pt(11), desc_size=Pt(9.8), space_before=Pt(8))
 
-        pd = tf.add_paragraph()
-        pd.text = w_d
-        pd.font.name = FONT_MAIN
-        pd.font.size = Pt(9.8)
-        pd.font.color.rgb = TEXT_MUTED
-        pd.space_before = Pt(2)
-
-    box_when_dg = s9.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c2_x, cards_y, col_w, cards_h)
-    box_when_dg.fill.solid()
-    box_when_dg.fill.fore_color.rgb = CARD_BG
-    box_when_dg.line.color.rgb = ACCENT_PURPLE
-    box_when_dg.line.width = Pt(1.5)
-    tf = box_when_dg.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.28)
-    tf.margin_right = Inches(0.28)
-    tf.margin_top = Inches(0.24)
-    tf.margin_bottom = Inches(0.2)
-
-    p = tf.paragraphs[0]
-    p.text = "🎯 NÊN CHỌN DAGSTER KHI:"
-    p.font.name = FONT_MAIN
-    p.font.size = Pt(16.5)
-    p.font.bold = True
-    p.font.color.rgb = ACCENT_PURPLE
+    box_when_dg = create_card(s9, c2_x, cards_y, col_w, cards_h, border_color=ACCENT_PURPLE, border_width=Pt(1.5), radius=0.05)
+    add_card_header(box_when_dg, "🎯 NÊN CHỌN DAGSTER KHI:", ACCENT_PURPLE)
 
     for w_t, w_d in [
         ("Xây dựng Modern Data Platform / Data Mesh:", "Nơi tài sản dữ liệu, chất lượng dữ liệu và Data Catalog là ưu tiên hàng đầu."),
@@ -1097,20 +906,7 @@ def create_presentation():
         ("Môi trường phát triển đa đội ngũ:", "Nhiều team cùng phát triển trên các Code Server cô lập, không ảnh hưởng lẫn nhau."),
         ("Muốn trải nghiệm phát triển (DevX) vượt trội:", "Giao diện hiện đại, trực quan, hỗ trợ reload code chỉ với một cú click.")
     ]:
-        pt = tf.add_paragraph()
-        pt.text = f"• {w_t}"
-        pt.font.name = FONT_MAIN
-        pt.font.bold = True
-        pt.font.size = Pt(11)
-        pt.font.color.rgb = TEXT_MAIN
-        pt.space_before = Pt(8)
-
-        pd = tf.add_paragraph()
-        pd.text = w_d
-        pd.font.name = FONT_MAIN
-        pd.font.size = Pt(9.8)
-        pd.font.color.rgb = TEXT_MUTED
-        pd.space_before = Pt(2)
+        add_card_bullet(box_when_dg, w_t, w_d, title_size=Pt(11), desc_size=Pt(9.8), space_before=Pt(8))
 
     add_speaker_notes(s9, "Speaker Note: Đưa ra lời khuyên thực tiễn cho ban lãnh đạo và các nhóm kỹ thuật: lựa chọn công cụ dựa trên bài toán cụ thể chứ không theo trào lưu.")
 
@@ -1149,13 +945,8 @@ def create_presentation():
 
     for idx, (p_phase, p_sub, p_color, p_items) in enumerate(phases):
         px = start_3_x + (col_3_w + gap_3) * idx
-        card = s10.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, px, cards_y, col_3_w, cards_h)
-        card.fill.solid()
-        card.fill.fore_color.rgb = CARD_BG
-        card.line.color.rgb = p_color
-        card.line.width = Pt(1.5)
+        card = create_card(s10, px, cards_y, col_3_w, cards_h, border_color=p_color, border_width=Pt(1.5), radius=0.05)
         tf = card.text_frame
-        tf.word_wrap = True
         tf.margin_left = Inches(0.24)
         tf.margin_right = Inches(0.24)
         tf.margin_top = Inches(0.24)
@@ -1213,14 +1004,9 @@ def create_presentation():
     ]
 
     for idx, (m_t, m_d, m_col) in enumerate(messages):
-        card_m = s11.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), msg_top_y + (msg_card_h + msg_gap) * idx,
-                                      full_card_w, msg_card_h)
-        card_m.fill.solid()
-        card_m.fill.fore_color.rgb = CARD_BG
-        card_m.line.color.rgb = m_col
-        card_m.line.width = Pt(1.2)
+        card_m = create_card(s11, Inches(0.8), msg_top_y + (msg_card_h + msg_gap) * idx,
+                             full_card_w, msg_card_h, border_color=m_col, border_width=Pt(1.2), radius=0.05)
         tf = card_m.text_frame
-        tf.word_wrap = True
         tf.margin_left = Inches(0.24)
         tf.margin_right = Inches(0.24)
         tf.margin_top = Inches(0.12)
@@ -1243,13 +1029,9 @@ def create_presentation():
     # Bottom Section: Dedicated Q&A & Appreciation Banner
     banner_y = Inches(5.38)
     banner_h = Inches(1.58)
-    qa_banner = s11.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), banner_y, full_card_w, banner_h)
-    qa_banner.fill.solid()
-    qa_banner.fill.fore_color.rgb = CARD_BG
-    qa_banner.line.color.rgb = BORDER_PURPLE
-    qa_banner.line.width = Pt(1.5)
+    qa_banner = create_card(s11, Inches(0.8), banner_y, full_card_w, banner_h,
+                            border_color=BORDER_PURPLE, border_width=Pt(1.5), radius=0.05)
     tf_qa = qa_banner.text_frame
-    tf_qa.word_wrap = True
     tf_qa.vertical_anchor = MSO_ANCHOR.MIDDLE
 
     p_qa = tf_qa.paragraphs[0]

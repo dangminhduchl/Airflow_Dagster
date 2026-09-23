@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Slide 7 - Infrastructure & Platform Positioning</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #050d1a;
+      color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      width: 2560px;
+      height: 1440px;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px 28px 32px;
+      gap: 14px;
+      overflow: hidden;
+    }
+    .slide-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .slide-title {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .slide-badge {
+      font-size: 14px;
+      color: #c084fc;
+      background: rgba(192,132,252,0.12);
+      border: 1px solid rgba(192,132,252,0.3);
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 0.9fr 1.1fr;
+      gap: 16px;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+    .card {
+      background: rgba(10, 22, 40, 0.85);
+      border: 1.5px solid;
+      border-radius: 18px;
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .badge {
+      font-size: 14px;
+      padding: 3px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      justify-content: space-between;
+    }
+    .sub-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid;
+      border-radius: 10px;
+      padding: 10px 14px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .sub-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .sub-body {
+      font-size: 18px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255,255,255,0.08);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 13.5px;
+    }
+    .card-bottom {
+      grid-column: 1 / -1;
+      border-color: rgba(168, 85, 247, 0.4);
+      background: rgba(30, 41, 59, 0.35);
+    }
+    .card-bottom .card-header {
+      border-color: rgba(168, 85, 247, 0.25);
+    }
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      flex: 1;
+      min-height: 0;
+      align-items: start;
+    }
+    .bottom-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .bottom-col-title {
+      font-size: 20px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    ul {
+      padding-left: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      color: #cbd5e1;
+      font-size: 18px;
+      line-height: 1.55;
+    }
+    .summary-box {
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 18px;
+      color: #e2e8f0;
+    }
+    .code-block {
+      background: #020617;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #e2e8f0;
+      line-height: 1.45;
+      margin: 4px 0;
+    }
+    .divider {
+      border-right: 1px solid rgba(56, 189, 248, 0.18);
+      padding-right: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide-header">
+    <div class="slide-title">🏗️ Slide 7: Hạ Tầng On-Premise & Định Vị Nền Tảng</div>
+    <div class="slide-badge">Infrastructure & CI/CD</div>
+  </div>
+  <div class="layout">
+    <!-- Block 1 (Top Left): Infrastructure -->
+    <div class="card" style="border-color: rgba(56,189,248,0.45);">
+      <div class="card-header" style="border-color: rgba(56,189,248,0.2);">
+        <div class="card-title" style="color:#38bdf8;">🏗️ KIẾN TRÚC HẠ TẦNG ON-PREMISE</div>
+        <span class="badge" style="color:#38bdf8; background:rgba(56,189,248,0.15);">Ops Overhead</span>
+      </div>
+      <div class="card-body">
+        <!-- Airflow Infra -->
+        <div class="sub-card" style="border-color: rgba(244,63,94,0.4);">
+          <div class="sub-title">
+            <span style="color:#fb7185;">🔴 AIRFLOW (6 THÀNH PHẦN RỜI RẠC)</span>
+            <span style="font-size:13px; color:#fca5a5;">Cồng kềnh & Dễ nghẽn</span>
+          </div>
+          <div class="sub-body">
+            • <strong>Stack:</strong> Scheduler + Celery Worker Pool + Redis Queue + Postgres HA + Webserver + Triggerer.<br>
+            • <strong>Nỗi đau đĩa chia sẻ:</strong> Bắt buộc dựng NFS/EFS chia sẻ để đồng bộ file <code>dags/</code> giữa các node.<br>
+            • <strong>Xung đột package:</strong> Toàn bộ task chung Python env; 1 team upgrade pandas làm gãy pipeline team khác.
+          </div>
+        </div>
+        <!-- Dagster Infra -->
+        <div class="sub-card" style="border-color: rgba(34,197,94,0.45);">
+          <div class="sub-title">
+            <span style="color:#4ade80;">🟢 DAGSTER (CHUẨN KUBERNETES & CLOUD-NATIVE)</span>
+            <span style="font-size:13px; color:#86efac;">Tinh gọn & Độc lập</span>
+          </div>
+          <div class="sub-body">
+            • <strong>Stack:</strong> Chỉ cần Dagster Webserver + Daemon + PostgreSQL HA (chỉ lưu event metadata nhẹ).<br>
+            • <strong>Lưu trữ đối tượng:</strong> Cụm MinIO phân tán làm S3 nội bộ, I/O Manager tự động đẩy/kéo dữ liệu.<br>
+            • <strong>Code Location Pods:</strong> Đóng gói Docker riêng, gọi gRPC. Tự do dùng Python 3.10/3.11/3.12 cách ly.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Block 2 (Top Right): CI/CD & Testing -->
+    <div class="card" style="border-color: rgba(192,132,252,0.45);">
+      <div class="card-header" style="border-color: rgba(192,132,252,0.2);">
+        <div class="card-title" style="color:#c084fc;">🧪 NĂNG LỰC KIỂM THỬ CI/CD & DEVX</div>
+        <span class="badge" style="color:#c084fc; background:rgba(192,132,252,0.15);">Pytest In-Memory</span>
+      </div>
+      <div class="card-body">
+        <!-- Airflow Testing -->
+        <div class="sub-card" style="border-color: rgba(245,158,11,0.4); flex: 0.9;">
+          <div class="sub-title" style="color:#f59e0b;">⚠️ Airflow: Rào Cản Lớn Khi Viết Unit Test & CI/CD</div>
+          <div class="sub-body">
+            • Task gắn chặt với <code>ti</code>, <code>context</code>, <code>dag_run</code> → Rất khó mock dữ liệu cục bộ.<br>
+            • Muốn test phải dựng Docker Compose & migrate Postgres (mất 3-5 phút) → Không thể tích hợp Git Hook.
+          </div>
+        </div>
+        <!-- Dagster Testing -->
+        <div class="sub-card" style="border-color: rgba(6,182,212,0.45); flex: 1.1;">
+          <div class="sub-title">
+            <span style="color:#38bdf8;">💎 Dagster: Unit Test Trong RAM 0.12s (4/4 Tests)</span>
+            <span style="font-size:13px; background:rgba(34,197,94,0.2); color:#4ade80; padding:2px 8px; border-radius:5px; font-weight:700;">pytest passed</span>
+          </div>
+          <div class="code-block">
+            <span style="color:#c084fc;">def</span> <span style="color:#60a5fa;">test_budget_limit_blocks_over_budget</span>():<br>
+            &nbsp;&nbsp;res = check_budget_limit_compliance(mock_120m_invoices)<br>
+            &nbsp;&nbsp;<span style="color:#f43f5e; font-weight:700;">assert not</span> res.passed <span style="color:#64748b;"># Ngắt luồng trong 0.02s!</span>
+          </div>
+          <div style="font-size:13.5px; color:#94a3b8; margin-top:4px;">✨ Tự động kích hoạt kiểm thử trong GitLab CI / GitHub Actions trên từng PR trước khi merge.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Block 3 (Bottom span): Platform Positioning -->
+    <div class="card card-bottom">
+      <div class="card-header">
+        <div class="card-title" style="color:#c084fc;">🎯 KHI NÀO NÊN CHỌN AIRFLOW HAY DAGSTER?</div>
+        <span class="badge" style="color:#c084fc; background:rgba(192,132,252,0.15);">ĐỊNH VỊ NỀN TẢNG</span>
+      </div>
+      <div class="bottom-grid">
+        <!-- Airflow Column -->
+        <div class="bottom-col divider">
+          <div class="bottom-col-title" style="color:#38bdf8;">
+            <span>⚙️ KHI NÀO NÊN CHỌN APACHE AIRFLOW?</span>
+            <span class="badge" style="color:#38bdf8; background:rgba(56,189,248,0.15); font-size:13px;">Hạ Tầng Sẵn Có</span>
+          </div>
+          <ul>
+            <li><strong>Điều phối hạ tầng chung (Infra Orchestration):</strong> Bật/tắt máy ảo, trigger job dbt snapshot, gửi email cảnh báo, dọn log hệ thống định kỳ.</li>
+            <li><strong>Tác vụ độc lập, thô (Coarse-grained Batch):</strong> Kích hoạt các job Spark, Trino, Flink chạy độc lập, không cần trao đổi dữ liệu phức tạp giữa các bước.</li>
+            <li><strong>Đã có sẵn cụm On-Premise ổn định:</strong> Doanh nghiệp đã đầu tư hạ tầng VM/Celery với đội ngũ Ops quen vận hành 6 thành phần và ổ đĩa mạng NFS.</li>
+            <li><strong>Kiểm thử chấp nhận mô hình truyền thống:</strong> Chấp nhận việc test gắn chặt với Database (dựng Docker Compose mất 3-5 phút/lần test).</li>
+          </ul>
+          <div class="summary-box" style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.25);">
+            📌 <strong>Tóm lại:</strong> Phù hợp cho hạ tầng có sẵn, điều phối máy ảo và các luồng xử lý mẻ truyền thống (Cronjob).
+          </div>
+        </div>
+        <!-- Dagster Column -->
+        <div class="bottom-col">
+          <div class="bottom-col-title" style="color:#4ade80;">
+            <span>💎 KHI NÀO NÊN CHỌN DAGSTER?</span>
+            <span class="badge" style="color:#4ade80; background:rgba(34,197,94,0.2); font-size:13px; font-weight:700;">ĐỀ XUẤT SỐ 1</span>
+          </div>
+          <ul>
+            <li><strong>Thay thế AWS Step Functions On-Premise:</strong> Pipeline phân nhánh nghiệp vụ phức tạp, xử lý hồ sơ, OCR và đối soát tài chính theo State Machine.</li>
+            <li><strong>Hạ tầng Cloud-Native K8s tinh gọn:</strong> Chỉ 3 service cốt lõi (Webserver, Daemon, Postgres nhẹ). Lưu trữ MinIO S3 nội bộ. Cô lập Pods qua gRPC.</li>
+            <li><strong>Kiểm thử tự động CI/CD 0.12s:</strong> Viết unit test in-memory bằng pytest trong RAM, tích hợp mượt mà GitLab CI / GitHub Actions tự động kiểm thử.</li>
+            <li><strong>Bảo vệ chất lượng dữ liệu:</strong> Tích hợp sẵn Asset Checks (<code>blocking=True</code>) chặn đứng hóa đơn vượt ngân sách 100M ngay trong chu trình chạy.</li>
+          </ul>
+          <div class="summary-box" style="background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3);">
+            🚀 <strong>Tóm lại:</strong> Nền tảng toàn diện nhất để thay thế AWS Step Functions trên On-Premise, chuẩn hóa văn hóa kỹ nghệ phần mềm cho đội Data!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

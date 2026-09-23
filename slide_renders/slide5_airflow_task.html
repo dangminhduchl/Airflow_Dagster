@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Slide 5 - Airflow Task Execution</title>
+  <script src="../mermaid.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #07050e;
+      color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      width: 2560px;
+      height: 1350px;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px 28px 32px;
+      gap: 14px;
+      overflow: hidden;
+    }
+    .slide-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .slide-title {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .slide-badge {
+      font-size: 14px;
+      color: #38bdf8;
+      background: rgba(56,189,248,0.12);
+      border: 1px solid rgba(56,189,248,0.3);
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 20px;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1.5px solid;
+      border-radius: 18px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .card-left {
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+      margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .badge {
+      font-size: 14px;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.15);
+      padding: 3px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .mermaid-area {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mermaid {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mermaid svg {
+      height: 100% !important;
+      max-height: 100% !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .mermaid text, .mermaid .nodeLabel {
+      font-family: 'Plus Jakarta Sans', sans-serif !important;
+      font-size: 17px !important;
+      font-weight: 600 !important;
+    }
+    .mermaid .edgeLabel {
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      background: rgba(7, 5, 14, 0.9) !important;
+      padding: 2px 6px !important;
+      border-radius: 4px !important;
+    }
+    /* Right side analysis cards */
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+    }
+    .analysis-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1.5px solid;
+      border-radius: 14px;
+      padding: 12px 18px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .analysis-title {
+      font-size: 19px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .analysis-body {
+      font-size: 16px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255,255,255,0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 14.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide-header">
+    <div class="slide-title">⚙️ Slide 5: 1 Task Trong Airflow – Chu Trình Thực Thi</div>
+    <div class="slide-badge">Airflow Internals</div>
+  </div>
+  <div class="layout">
+    <!-- Left: Mermaid Flowchart -->
+    <div class="card card-left">
+      <div class="card-header">
+        <div class="card-title">⚙️ AIRFLOW TASK EXECUTION</div>
+        <span class="badge">Chu Trình 6 Bước</span>
+      </div>
+      <div class="mermaid-area">
+        <div class="mermaid">
+flowchart TD
+  S1["📁 1. Write Code File<br/><i>(dags/invoice_dag.py)</i>"]
+  S2["🔄 2. DAG Parsing Loop (Every 30s)<br/><i>(Scheduler re-compiles Python from disk)</i>"]
+  S3[("🗄️ 3. Task State Transitions (DB Hits)<br/><b>[NONE] ➔ [SCHEDULED] ➔ [QUEUED]</b>")]
+  S4["⚡ 4. Worker Pulls & Runs Task<br/><i>(State: <b>[RUNNING]</b> on Celery/K8s)</i>"]
+  S5[("📦 5. Data Exchange via XCom DB<br/><b>INSERT INTO xcom VALUES (...)</b><br/><i>(JSON/Pickle Payloads in Postgres)</i>")]
+  S6["💻 6. Webserver DB Polling<br/><i>(SELECT state ➔ Paints Box Green/Red)</i><br/><b>⚠️ DATA BLIND: No business data visible</b>"]
+
+  S1 --> S2
+  S2 -->|"CPU Overhead"| S3
+  S3 -->|"Push to Queue"| S4
+  S4 -->|"Task Returns Data"| S5
+  S4 -->|"Update Final State"| S3
+  S3 <-->|"Poll State"| S6
+
+  style S1 fill:#1e1b4b,stroke:#818cf8,color:#e0e7ff
+  style S2 fill:#4c0519,stroke:#f43f5e,color:#fca5a5
+  style S3 fill:#4c0519,stroke:#ef4444,color:#fca5a5
+  style S4 fill:#0f172a,stroke:#38bdf8,color:#f8fafc
+  style S5 fill:#4c0519,stroke:#ef4444,color:#fca5a5
+  style S6 fill:#0f172a,stroke:#f59e0b,color:#f8fafc
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: 4 Analysis Cards -->
+    <div class="right-col">
+      <div class="analysis-card" style="border-color: rgba(245,158,11,0.45);">
+        <div class="analysis-title" style="color:#f59e0b;">🔄 1. Bị Ép Re-Parse Liên Tục (30 Giây/Lần)</div>
+        <div class="analysis-body">Scheduler không lưu sẵn cấu trúc trên RAM mà liên tục đọc và biên dịch lại code Python từ đĩa. Nếu lỡ import OCR nặng hay gọi API ngoài hàm → <strong>Treo 100% CPU toàn cụm</strong>.</div>
+      </div>
+      <div class="analysis-card" style="border-color: rgba(239,68,68,0.45);">
+        <div class="analysis-title" style="color:#ef4444;">🗄️ 2. State Machine Bắn Query DB Dồn Dập</div>
+        <div class="analysis-body">Mỗi bước chuyển trạng thái (None → Scheduled → Queued → Running → Success) đều phải UPDATE vào bảng <code>task_instance</code> của PostgreSQL → Nguy cơ lock bảng khi có hàng nghìn task.</div>
+      </div>
+      <div class="analysis-card" style="border-color: rgba(168,85,247,0.45);">
+        <div class="analysis-title" style="color:#c084fc;">📦 3. Ép Nạp Dữ Liệu XCom Thẳng Vào Postgres</div>
+        <div class="analysis-body">Khi task <code>return</code> dữ liệu, Airflow biến nó thành JSON/Pickle rồi chạy lệnh <code>INSERT INTO xcom</code>. Dữ liệu lớn (ảnh hóa đơn, DataFrame) làm <strong>phình to DB và nghẽn I/O</strong>.</div>
+      </div>
+      <div class="analysis-card" style="border-color: rgba(244,63,94,0.45);">
+        <div class="analysis-title" style="color:#fb7185;">👁️ 4. Kết Thúc Bằng "Mù Dữ Liệu" Trên UI</div>
+        <div class="analysis-body">Webserver chỉ đọc DB để tô màu ô vuông Xanh/Đỏ. Người điều hành <strong>hoàn toàn không biết bên trong có bao nhiêu hóa đơn, bao nhiêu tiền</strong> nếu không tự mò vào từng task đọc log.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      securityLevel: 'loose',
+      flowchart: { useMaxWidth: false, htmlLabels: true, curve: 'basis' }
+    });
+  </script>
+</body>
+</html>
