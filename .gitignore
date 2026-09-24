@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Airflow runtime state (recreated on start)
+airflow_demo/airflow.db*
+airflow_demo/logs/
+airflow_demo/simple_auth_manager_passwords.json.generated
+airflow_demo/webserver_config.py
+airflow_demo/airflow-webserver.pid
+
+# Dagster runtime state
+dagster_demo/.tmp_dagster_home_*/
+.dagster_home/
+.tmp_dagster*/
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+.idea/

@@ -1,18 +1,18 @@
 """
 Multi-Page Invoice PDF Processing Workflow (Apache Airflow)
-HIỂN THỊ RÕ RÀNG 4 NHÁNH RẼ SONG SONG TRÊN GRAPH VIEW UI:
-1. Ingest Multi-Page PDF: Nạp file PDF tổng hợp (4 trang)
-2. Check 1 (@task.branch): Kiểm tra tính toàn vẹn của File PDF
+CLEARLY SHOWS 4 PARALLEL BRANCHES IN THE GRAPH VIEW UI:
+1. Ingest Multi-Page PDF: Load the combined PDF file (4 pages)
+2. Check 1 (@task.branch): Verify the integrity of the PDF file
 3. AI Classification & 4 Parallel Branches (.expand):
-   - Nhánh 1: extract_vat_invoice (Bóc tách MST 0101234567, Tiền gốc 50tr + VAT 5tr = 55tr)
-   - Nhánh 2: extract_utility_invoice (Bóc tách Mã PE0100098765, Tiền điện 1.85tr)
-   - Nhánh 3: extract_reimbursement_invoice (Bóc tách Mã NV-889, Vé bay 3.2tr)
-   - Nhánh 4: extract_invalid_invoice (Cảnh báo 150k không được khấu trừ thuế)
+   - Branch 1: extract_vat_invoice (Extract tax code 0101234567, subtotal 50M + VAT 5M = 55M)
+   - Branch 2: extract_utility_invoice (Extract customer code PE0100098765, electricity bill 1.85M)
+   - Branch 3: extract_reimbursement_invoice (Extract employee ID NV-889, flight ticket 3.2M)
+   - Branch 4: extract_invalid_invoice (Warn that 150k is not tax-deductible)
 4. Check 2 & 3 (@task.branch - Financial Audit):
-   - Kiểm tra công thức thuế (Tổng = Gốc + VAT)
-   - Kiểm tra hạn mức ngân sách (Tổng chi phí <= 100 triệu VNĐ)
-   - Nếu PASS -> Chốt Sổ Cái Kế Toán (lock_and_publish_financial_ledger)
-   - Nếu VI PHẠM -> Rẽ nhánh cảnh báo kiểm toán (alert_financial_audit_violation)
+   - Verify the tax formula (Total = Subtotal + VAT)
+   - Verify the budget limit (Total expense <= 100 million VND)
+   - If PASS -> Lock the accounting ledger (lock_and_publish_financial_ledger)
+   - If VIOLATED -> Branch to the audit alert (alert_financial_audit_violation)
 """
 from datetime import datetime
 from typing import List, Dict, Any
@@ -27,61 +27,61 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 # -------------------------------------------------------------
 @task
 def ingest_multipage_invoice_pdf() -> Dict[str, Any]:
-    """Giả lập nạp 1 file PDF tổng hợp chứa nhiều trang hóa đơn (Chung 100% dữ liệu với Dagster)."""
+    """Simulate loading a combined PDF file containing multiple invoice pages (100% same data as Dagster)."""
     return {
-        "pdf_filename": "chung_tu_dau_vao_thang_3.pdf",
+        "pdf_filename": "march_input_documents.pdf",
         "is_valid": True,
         "total_pages": 4,
         "pages": [
             {
                 "page_num": 1,
-                "raw_text": "HÓA ĐƠN GIÁ TRỊ GIA TĂNG (VAT)\nMẫu số: 01GTKT0/001\nMã số thuế bán: 0101234567\nTiền trước thuế: 50,000,000 VND\nThuế VAT (10%): 5,000,000 VND\nTổng thanh toán: 55,000,000 VND",
+                "raw_text": "VALUE-ADDED TAX (VAT) INVOICE\nForm No.: 01GTKT0/001\nSeller tax code: 0101234567\nAmount before tax: 50,000,000 VND\nVAT (10%): 5,000,000 VND\nTotal payment: 55,000,000 VND",
             },
             {
                 "page_num": 2,
-                "raw_text": "HÓA ĐƠN TIỀN ĐIỆN VĂN PHÒNG (EVN)\nMã khách hàng: PE0100098765\nChỉ số cũ: 1450 - Chỉ số mới: 1890\nKỳ tiêu thụ: Tháng 03/2026\nTổng tiền thanh toán: 1,850,000 VND",
+                "raw_text": "OFFICE ELECTRICITY BILL (EVN)\nCustomer code: PE0100098765\nPrevious reading: 1450 - Current reading: 1890\nBilling period: March 2026\nTotal payment: 1,850,000 VND",
             },
             {
                 "page_num": 3,
-                "raw_text": "HÓA ĐƠN CÔNG TÁC PHÍ - VÉ MÁY BAY\nNhân viên: Nguyễn Văn A (Mã NV: NV-889)\nHành trình: Hà Nội - TP.HCM\nMục đích: Gặp đối tác khách hàng\nTổng tiền: 3,200,000 VND",
+                "raw_text": "BUSINESS TRAVEL INVOICE - FLIGHT TICKET\nEmployee: Nguyen Van A (Employee ID: NV-889)\nRoute: Hanoi - Ho Chi Minh City\nPurpose: Meeting with a client partner\nTotal amount: 3,200,000 VND",
             },
             {
                 "page_num": 4,
-                "raw_text": "BIÊN LAI THU TIỀN BÁN LẺ (KHÔNG MST)\nCửa hàng tạp hóa văn phòng\nNội dung: Mua trà cà phê tiếp khách\nTổng tiền: 150,000 VND",
+                "raw_text": "RETAIL PAYMENT RECEIPT (NO TAX CODE)\nOffice convenience store\nDescription: Tea and coffee for guests\nTotal amount: 150,000 VND",
             },
         ],
     }
 
 
 # -------------------------------------------------------------
-# 2. CHECK 1 (@task.branch): Kiểm tra tính toàn vẹn của File
+# 2. CHECK 1 (@task.branch): Verify file integrity
 # -------------------------------------------------------------
 @task.branch
 def check_pdf_integrity(pdf_data: Dict[str, Any]) -> str:
-    """Check cấp độ File: Hợp lệ hay Rỗng/Hỏng."""
+    """File-level check: valid, or empty/corrupted."""
     is_valid = pdf_data.get("is_valid", False)
     pages = pdf_data.get("pages", [])
 
     if is_valid and len(pages) > 0:
-        print(f"[CHECK 1 PASS] File '{pdf_data.get('pdf_filename')}' hợp lệ ({len(pages)} trang). Tiếp tục bóc tách.")
+        print(f"[CHECK 1 PASS] File '{pdf_data.get('pdf_filename')}' is valid ({len(pages)} pages). Continuing extraction.")
         return "classify_invoice_pages"
     else:
-        print("[CHECK 1 FAIL] File bị lỗi hoặc rỗng. Rẽ nhánh bỏ qua.")
+        print("[CHECK 1 FAIL] File is corrupted or empty. Taking the skip branch.")
         return "handle_corrupted_pdf_file"
 
 
 @task
 def handle_corrupted_pdf_file():
-    print("[ALERT] File PDF không hợp lệ. Đã dừng quy trình xử lý.")
+    print("[ALERT] Invalid PDF file. Processing has been stopped.")
     return {"status": "CORRUPTED_OR_EMPTY"}
 
 
 # -------------------------------------------------------------
-# 3. AI PHÂN LOẠI 4 NHÓM HÓA ĐƠN
+# 3. AI CLASSIFICATION INTO 4 INVOICE GROUPS
 # -------------------------------------------------------------
 @task
 def classify_invoice_pages(pdf_data: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
-    """Phân loại 4 nhóm: VAT, Tiện ích, Công tác phí, Biên lai."""
+    """Classify into 4 groups: VAT, Utility, Travel reimbursement, Receipt."""
     groups = {
         "vat_invoices": [],
         "utility_invoices": [],
@@ -92,28 +92,28 @@ def classify_invoice_pages(pdf_data: Dict[str, Any]) -> Dict[str, List[Dict[str,
     for page in pdf_data["pages"]:
         text = page["raw_text"].upper()
 
-        if "GIÁ TRỊ GIA TĂNG" in text or "GTKT" in text:
-            groups["vat_invoices"].append({**page, "type": "HOA_DON_VAT"})
-        elif "TIỀN ĐIỆN" in text or "EVN" in text or "TIỀN NƯỚC" in text:
-            groups["utility_invoices"].append({**page, "type": "HOA_DON_TIEN_ICH"})
-        elif "CÔNG TÁC PHÍ" in text or "VÉ MÁY BAY" in text:
-            groups["reimbursement_invoices"].append({**page, "type": "HOA_DON_CONG_TAC_PHI"})
+        if "VALUE-ADDED TAX" in text or "GTKT" in text:
+            groups["vat_invoices"].append({**page, "type": "VAT_INVOICE"})
+        elif "ELECTRICITY" in text or "EVN" in text or "WATER" in text:
+            groups["utility_invoices"].append({**page, "type": "UTILITY_INVOICE"})
+        elif "BUSINESS TRAVEL" in text or "FLIGHT TICKET" in text:
+            groups["reimbursement_invoices"].append({**page, "type": "REIMBURSEMENT_INVOICE"})
         else:
-            groups["invalid_invoices"].append({**page, "type": "BIEN_LAI_KHONG_HOP_LE"})
+            groups["invalid_invoices"].append({**page, "type": "INVALID_RECEIPT"})
 
-    print(f"[AI CLASSIFIER] Phân loại thành công: VAT={len(groups['vat_invoices'])}, Tiện ích={len(groups['utility_invoices'])}, Công tác phí={len(groups['reimbursement_invoices'])}, Không hợp lệ={len(groups['invalid_invoices'])}")
+    print(f"[AI CLASSIFIER] Classification succeeded: VAT={len(groups['vat_invoices'])}, Utility={len(groups['utility_invoices'])}, Reimbursement={len(groups['reimbursement_invoices'])}, Invalid={len(groups['invalid_invoices'])}")
     return groups
 
 
 # -------------------------------------------------------------
-# 4. 4 TASK RẼ NHÁNH XỬ LÝ CHUYÊN BIỆT (HIỆN RÕ TRÊN GRAPH VIEW)
+# 4. 4 SPECIALIZED BRANCH TASKS (CLEARLY VISIBLE IN GRAPH VIEW)
 # -------------------------------------------------------------
 @task
 def extract_vat_invoice(page: Dict[str, Any]) -> Dict[str, Any]:
-    print(f"-> [Worker bóc tách VAT] Trang {page['page_num']}...")
+    print(f"-> [VAT extraction worker] Page {page['page_num']}...")
     return {
         "page_num": page["page_num"],
-        "category": "HOA_DON_VAT",
+        "category": "VAT_INVOICE",
         "tax_code": "0101234567",
         "subtotal": 50000000,
         "vat_amount": 5000000,
@@ -125,10 +125,10 @@ def extract_vat_invoice(page: Dict[str, Any]) -> Dict[str, Any]:
 
 @task
 def extract_utility_invoice(page: Dict[str, Any]) -> Dict[str, Any]:
-    print(f"-> [Worker bóc tách Tiền Điện] Trang {page['page_num']}...")
+    print(f"-> [Electricity extraction worker] Page {page['page_num']}...")
     return {
         "page_num": page["page_num"],
-        "category": "HOA_DON_TIEN_ICH",
+        "category": "UTILITY_INVOICE",
         "customer_code": "PE0100098765",
         "service_provider": "EVN",
         "billing_period": "03/2026",
@@ -140,13 +140,13 @@ def extract_utility_invoice(page: Dict[str, Any]) -> Dict[str, Any]:
 
 @task
 def extract_reimbursement_invoice(page: Dict[str, Any]) -> Dict[str, Any]:
-    print(f"-> [Worker bóc tách Vé Máy Bay] Trang {page['page_num']}...")
+    print(f"-> [Flight ticket extraction worker] Page {page['page_num']}...")
     return {
         "page_num": page["page_num"],
-        "category": "HOA_DON_CONG_TAC_PHI",
+        "category": "REIMBURSEMENT_INVOICE",
         "employee_id": "NV-889",
-        "employee_name": "Nguyễn Văn A",
-        "route": "Hà Nội - TP.HCM",
+        "employee_name": "Nguyen Van A",
+        "route": "Hanoi - Ho Chi Minh City",
         "total_amount": 3200000,
         "is_deductible": True,
         "status": "PROCESSED_REIMBURSEMENT_MODULE",
@@ -155,18 +155,18 @@ def extract_reimbursement_invoice(page: Dict[str, Any]) -> Dict[str, Any]:
 
 @task
 def extract_invalid_invoice(page: Dict[str, Any]) -> Dict[str, Any]:
-    print(f"-> [Worker xử lý Biên Lai] Trang {page['page_num']}...")
+    print(f"-> [Receipt processing worker] Page {page['page_num']}...")
     return {
         "page_num": page["page_num"],
-        "category": "BIEN_LAI_KHONG_HOP_LE",
+        "category": "INVALID_RECEIPT",
         "total_amount": 150000,
         "is_deductible": False,
-        "alert": "KHÔNG ĐƯỢC KHẤU TRỪ THUẾ TNDN",
+        "alert": "NOT DEDUCTIBLE FOR CORPORATE INCOME TAX",
         "status": "FLAGGED_FOR_HUMAN_AUDIT",
     }
 
 
-# Helper tasks trích xuất list từng loại
+# Helper tasks that extract the page list for each category
 @task
 def get_vat_pages(groups: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
     return groups.get("vat_invoices", [])
@@ -191,7 +191,7 @@ def collect_extracted_invoices(
     reimburse_res: Any = None,
     invalid_res: Any = None,
 ) -> List[Dict[str, Any]]:
-    """Gom tất cả hóa đơn sau khi 4 nhánh bóc tách song song hoàn thành an toàn."""
+    """Collect all invoices once the 4 parallel extraction branches have completed safely."""
     results: List[Dict[str, Any]] = []
     for chunk in [vat_res, utility_res, reimburse_res, invalid_res]:
         if chunk is None:
@@ -212,52 +212,52 @@ def collect_extracted_invoices(
 
 # -------------------------------------------------------------
 # 6. CHECK 2 & 3 (@task.branch - Financial Audit):
-# KIỂM ĐỊNH TOÁN THUẾ & HẠN MỨC NGÂN SÁCH (ĐỒNG NHẤT VỚI DAGSTER)
+# TAX MATH & BUDGET LIMIT AUDIT (IDENTICAL TO DAGSTER)
 # -------------------------------------------------------------
 @task.branch
 def audit_financial_budget_compliance(all_invoices: List[Dict[str, Any]]) -> str:
     """
-    Kiểm tra 2 quy tắc tài chính sau khi gom kết quả từ vòng lặp:
-    - Check 2: Công thức thuế VAT (Tổng == Gốc + VAT)
-    - Check 3: Hạn mức ngân sách <= 100.000.000 VND và không có số tiền âm
+    Verify 2 financial rules after collecting the results from the mapped loop:
+    - Check 2: VAT tax formula (Total == Subtotal + VAT)
+    - Check 3: Budget limit <= 100,000,000 VND and no negative amounts
     """
     total_cost = sum(inv["total_amount"] for inv in all_invoices)
-    budget_limit = 100000000  # 100 triệu VNĐ
+    budget_limit = 100000000  # 100 million VND
     has_negative = any(inv["total_amount"] <= 0 for inv in all_invoices)
 
-    # Kiểm tra thuế VAT
-    vat_invoices = [inv for inv in all_invoices if inv["category"] == "HOA_DON_VAT"]
+    # Verify VAT math
+    vat_invoices = [inv for inv in all_invoices if inv["category"] == "VAT_INVOICE"]
     vat_math_ok = all(inv["subtotal"] + inv["vat_amount"] == inv["total_amount"] for inv in vat_invoices)
 
     if (total_cost <= budget_limit) and (not has_negative) and vat_math_ok:
-        print(f"[FINANCIAL AUDIT PASS] Tổng chi phí {total_cost:,} VND <= Ngân sách {budget_limit:,} VND. Cho phép chốt sổ.")
+        print(f"[FINANCIAL AUDIT PASS] Total expense {total_cost:,} VND <= Budget {budget_limit:,} VND. Ledger lock allowed.")
         return "lock_and_publish_financial_ledger"
     else:
-        print(f"[FINANCIAL AUDIT FAIL] Vi phạm ngân sách hoặc sai lệch thuế. Rẽ nhánh cảnh báo!")
+        print(f"[FINANCIAL AUDIT FAIL] Budget violation or tax mismatch. Taking the alert branch!")
         return "alert_financial_audit_violation"
 
 
 @task
 def alert_financial_audit_violation():
-    """Nhánh xử lý khi vi phạm kiểm toán tài chính."""
-    print("[ALERT] Khóa Sổ Cái Kế Toán: Phát hiện vượt hạn mức hoặc sai lệch tiền thuế!")
+    """Branch that handles a financial audit violation."""
+    print("[ALERT] Accounting ledger locked: budget exceeded or tax amount mismatch detected!")
     return {"status": "BLOCKED_AUDIT_VIOLATION"}
 
 
 @task
 def lock_and_publish_financial_ledger(all_invoices: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Nhánh chốt sổ cái chi phí thành công khi các check đều PASS."""
+    """Branch that locks the expense ledger when all checks PASS."""
     total_expense = sum(inv["total_amount"] for inv in all_invoices)
     total_vat = sum(inv.get("vat_amount", 0) for inv in all_invoices if inv.get("is_deductible", False))
 
     report = {
-        "pdf_source": "chung_tu_dau_vao_thang_3.pdf",
+        "pdf_source": "march_input_documents.pdf",
         "total_invoices_processed": len(all_invoices),
         "total_expense_vnd": total_expense,
         "total_vat_deductible_vnd": total_vat,
         "status": "APPROVED_AND_LOCKED_IN_ERP",
     }
-    print(f"[FINANCIAL LEDGER LOCKED] Đã chốt sổ cái chi phí: {report}")
+    print(f"[FINANCIAL LEDGER LOCKED] Expense ledger locked: {report}")
     return report
 
 
@@ -282,27 +282,27 @@ def invoice_multipage_pdf_workflow():
     pdf_data = ingest_multipage_invoice_pdf()
     file_branch = check_pdf_integrity(pdf_data)
 
-    # Nhánh Skip nếu file hỏng
+    # Skip branch if the file is corrupted
     corrupted_task = handle_corrupted_pdf_file()
     file_branch >> corrupted_task >> finish
 
-    # 2. Phân loại 4 nhóm trang
+    # 2. Classify pages into 4 groups
     classified_groups = classify_invoice_pages(pdf_data)
     file_branch >> classified_groups
 
-    # 3. Lấy 4 list trang
+    # 3. Get the 4 page lists
     vat_pages = get_vat_pages(classified_groups)
     utility_pages = get_utility_pages(classified_groups)
     reimburse_pages = get_reimbursement_pages(classified_groups)
     invalid_pages = get_invalid_pages(classified_groups)
 
-    # 4. CHẠY SONG SONG 4 HỘP TASK RẼ NHÁNH HIỂN THỊ RÕ RÀNG TRÊN UI GRAPH VIEW:
+    # 4. RUN THE 4 BRANCH TASKS IN PARALLEL, CLEARLY VISIBLE IN THE GRAPH VIEW UI:
     vat_mapped = extract_vat_invoice.expand(page=vat_pages)
     utility_mapped = extract_utility_invoice.expand(page=utility_pages)
     reimburse_mapped = extract_reimbursement_invoice.expand(page=reimburse_pages)
     invalid_mapped = extract_invalid_invoice.expand(page=invalid_pages)
 
-    # 5. Gom kết quả từ 4 nhánh
+    # 5. Collect results from the 4 branches
     collected_invoices = collect_extracted_invoices(
         vat_res=vat_mapped,
         utility_res=utility_mapped,
@@ -310,17 +310,17 @@ def invoice_multipage_pdf_workflow():
         invalid_res=invalid_mapped,
     )
 
-    # 6. Check 2 & 3: Kiểm định tài chính & Ngân sách sau khi gom kết quả
+    # 6. Check 2 & 3: Financial & budget audit after collecting results
     audit_branch = audit_financial_budget_compliance(collected_invoices)
 
-    # Nhánh Vi phạm
+    # Violation branch
     alert_task = alert_financial_audit_violation()
     audit_branch >> alert_task >> finish
 
-    # Nhánh Thành công: Chốt sổ cái
+    # Success branch: lock the ledger
     success_ledger = lock_and_publish_financial_ledger(collected_invoices)
     audit_branch >> success_ledger >> finish
 
 
-# Khởi tạo DAG object
+# Instantiate the DAG object
 invoice_dag = invoice_multipage_pdf_workflow()

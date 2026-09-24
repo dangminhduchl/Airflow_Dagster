@@ -1,9 +1,9 @@
 """
 Multi-Page Invoice PDF Processing Pipeline in Dagster (Software-Defined Assets)
-CÙNG 100% BÀI TOÁN & TẬP HỢP CÁC CHECK VỚI AIRFLOW:
-- Check 1: Kiểm tra tính toàn vẹn file PDF (File Integrity Check)
-- Check 2: Kiểm tra công thức tính thuế VAT (Tổng = Tiền gốc + VAT)
-- Check 3: Kiểm tra hạn mức ngân sách chi phí (Tổng <= 100 triệu & Tiền > 0, BLOCKING)
+100% SAME PROBLEM & SET OF CHECKS AS AIRFLOW:
+- Check 1: Verify PDF file integrity (File Integrity Check)
+- Check 2: Verify the VAT tax formula (Total = Subtotal + VAT)
+- Check 3: Verify the expense budget limit (Total <= 100 million & Amount > 0, BLOCKING)
 """
 from typing import List, Dict, Any
 from dagster import (
@@ -17,48 +17,48 @@ from dagster import (
 
 
 # -------------------------------------------------------------
-# ASSET 1: Dữ liệu file PDF hóa đơn thô (Raw Ingestion)
+# ASSET 1: Raw invoice PDF file data (Raw Ingestion)
 # -------------------------------------------------------------
 @asset(group_name="invoice_pipeline")
 def raw_multipage_invoice_pdf() -> Dict[str, Any]:
-    """Tài sản dữ liệu: File PDF tổng hợp chứng từ đầu vào tháng 3."""
+    """Data asset: combined PDF of the March input documents."""
     return {
-        "pdf_filename": "chung_tu_dau_vao_thang_3.pdf",
+        "pdf_filename": "march_input_documents.pdf",
         "is_valid": True,
         "total_pages": 4,
         "pages": [
             {
                 "page_num": 1,
-                "raw_text": "HÓA ĐƠN GIÁ TRỊ GIA TĂNG (VAT)\nMẫu số: 01GTKT0/001\nMã số thuế bán: 0101234567\nTiền trước thuế: 50,000,000 VND\nThuế VAT (10%): 5,000,000 VND\nTổng thanh toán: 55,000,000 VND",
+                "raw_text": "VALUE-ADDED TAX (VAT) INVOICE\nForm No.: 01GTKT0/001\nSeller tax code: 0101234567\nAmount before tax: 50,000,000 VND\nVAT (10%): 5,000,000 VND\nTotal payment: 55,000,000 VND",
             },
             {
                 "page_num": 2,
-                "raw_text": "HÓA ĐƠN TIỀN ĐIỆN VĂN PHÒNG (EVN)\nMã khách hàng: PE0100098765\nChỉ số cũ: 1450 - Chỉ số mới: 1890\nKỳ tiêu thụ: Tháng 03/2026\nTổng tiền thanh toán: 1,850,000 VND",
+                "raw_text": "OFFICE ELECTRICITY BILL (EVN)\nCustomer code: PE0100098765\nPrevious reading: 1450 - Current reading: 1890\nBilling period: March 2026\nTotal payment: 1,850,000 VND",
             },
             {
                 "page_num": 3,
-                "raw_text": "HÓA ĐƠN CÔNG TÁC PHÍ - VÉ MÁY BAY\nNhân viên: Nguyễn Văn A (Mã NV: NV-889)\nHành trình: Hà Nội - TP.HCM\nMục đích: Gặp đối tác khách hàng\nTổng tiền: 3,200,000 VND",
+                "raw_text": "BUSINESS TRAVEL INVOICE - FLIGHT TICKET\nEmployee: Nguyen Van A (Employee ID: NV-889)\nRoute: Hanoi - Ho Chi Minh City\nPurpose: Meeting with a client partner\nTotal amount: 3,200,000 VND",
             },
             {
                 "page_num": 4,
-                "raw_text": "BIÊN LAI THU TIỀN BÁN LẺ (KHÔNG MST)\nCửa hàng tạp hóa văn phòng\nNội dung: Mua trà cà phê tiếp khách\nTổng tiền: 150,000 VND",
+                "raw_text": "RETAIL PAYMENT RECEIPT (NO TAX CODE)\nOffice convenience store\nDescription: Tea and coffee for guests\nTotal amount: 150,000 VND",
             },
         ],
     }
 
 
 # -------------------------------------------------------------
-# 🛡️ CHECK 1 (@asset_check: Kiểm tra tính toàn vẹn của File PDF)
-# (TƯƠNG ĐƯƠNG @task.branch check_pdf_integrity BÊN AIRFLOW)
+# 🛡️ CHECK 1 (@asset_check: Verify PDF file integrity)
+# (EQUIVALENT TO @task.branch check_pdf_integrity IN AIRFLOW)
 # -------------------------------------------------------------
 @asset_check(
     asset=raw_multipage_invoice_pdf,
-    description="Check 1: Kiểm tra file PDF hợp lệ và có số trang > 0",
+    description="Check 1: Verify the PDF file is valid and has more than 0 pages",
 )
 def check_pdf_file_integrity(
     raw_multipage_invoice_pdf: Dict[str, Any]
 ) -> AssetCheckResult:
-    """Kiểm tra tính toàn vẹn của tệp PDF đầu vào."""
+    """Verify the integrity of the input PDF file."""
     is_valid = raw_multipage_invoice_pdf.get("is_valid", False)
     pages = raw_multipage_invoice_pdf.get("pages", [])
     passed = is_valid and len(pages) > 0
@@ -68,7 +68,7 @@ def check_pdf_file_integrity(
         "metadata": {
             "file_name": MetadataValue.text(raw_multipage_invoice_pdf.get("pdf_filename", "")),
             "total_pages": MetadataValue.int(len(pages)),
-            "assessment": "FILE HỢP LỆ ĐỦ ĐIỀU KIỆN XỬ LÝ" if passed else "LỖI: FILE HỎNG HOẶC RỖNG",
+            "assessment": "FILE IS VALID AND READY FOR PROCESSING" if passed else "ERROR: FILE IS CORRUPTED OR EMPTY",
         },
     }
     if not passed:
@@ -78,32 +78,32 @@ def check_pdf_file_integrity(
 
 
 # -------------------------------------------------------------
-# ASSET 2: Tách trang & AI Bóc tách sơ bộ (Extracted Pages)
+# ASSET 2: Page splitting & preliminary AI extraction (Extracted Pages)
 # -------------------------------------------------------------
 @asset(group_name="invoice_pipeline")
 def extracted_invoice_pages(
     raw_multipage_invoice_pdf: Dict[str, Any]
 ) -> Output[List[Dict[str, Any]]]:
-    """Tài sản dữ liệu: Danh sách từng trang PDF sau khi qua OCR và AI Parser."""
+    """Data asset: list of PDF pages after OCR and the AI parser."""
     pages = raw_multipage_invoice_pdf["pages"]
     extracted = []
 
     for p in pages:
         text = p["raw_text"].upper()
-        if "GIÁ TRỊ GIA TĂNG" in text:
-            category = "HOA_DON_VAT"
-        elif "TIỀN ĐIỆN" in text or "EVN" in text:
-            category = "HOA_DON_TIEN_ICH"
-        elif "CÔNG TÁC PHÍ" in text or "VÉ MÁY BAY" in text:
-            category = "HOA_DON_CONG_TAC_PHI"
+        if "VALUE-ADDED TAX" in text:
+            category = "VAT_INVOICE"
+        elif "ELECTRICITY" in text or "EVN" in text:
+            category = "UTILITY_INVOICE"
+        elif "BUSINESS TRAVEL" in text or "FLIGHT TICKET" in text:
+            category = "REIMBURSEMENT_INVOICE"
         else:
-            category = "BIEN_LAI_KHONG_HOP_LE"
+            category = "INVALID_RECEIPT"
 
         extracted.append({
             "page_num": p["page_num"],
             "category": category,
             "raw_text": p["raw_text"],
-            "ocr_confidence": 95.0 if category != "BIEN_LAI_KHONG_HOP_LE" else 65.0,
+            "ocr_confidence": 95.0 if category != "INVALID_RECEIPT" else 65.0,
             "status": "EXTRACTED",
         })
 
@@ -118,17 +118,17 @@ def extracted_invoice_pages(
 
 # -------------------------------------------------------------
 # -------------------------------------------------------------
-# 4 ASSET RẼ NHÁNH XỬ LÝ CHUYÊN BIỆT (XÓA BỎ HOÀN TOÀN IF/ELSE)
-# Hiển thị 4 nhánh song song trên Dagster Asset Graph
+# 4 SPECIALIZED BRANCH ASSETS (NO IF/ELSE AT ALL)
+# Shown as 4 parallel branches in the Dagster Asset Graph
 # -------------------------------------------------------------
 @asset(group_name="invoice_pipeline")
 def vat_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
-    """Tài sản dữ liệu: Danh sách hóa đơn Giá trị gia tăng (VAT) bóc tách chuyên biệt."""
-    pages = [p for p in extracted_invoice_pages if p["category"] == "HOA_DON_VAT"]
+    """Data asset: list of extracted Value-Added Tax (VAT) invoices."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "VAT_INVOICE"]
     results = [
         {
             "page_num": p["page_num"],
-            "category": "HOA_DON_VAT",
+            "category": "VAT_INVOICE",
             "tax_code": "0101234567",
             "subtotal": 50000000,
             "vat_amount": 5000000,
@@ -149,12 +149,12 @@ def vat_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[D
 
 @asset(group_name="invoice_pipeline")
 def utility_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
-    """Tài sản dữ liệu: Danh sách hóa đơn Tiền điện / Nước (EVN) bóc tách chuyên biệt."""
-    pages = [p for p in extracted_invoice_pages if p["category"] == "HOA_DON_TIEN_ICH"]
+    """Data asset: list of extracted electricity / water (EVN) invoices."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "UTILITY_INVOICE"]
     results = [
         {
             "page_num": p["page_num"],
-            "category": "HOA_DON_TIEN_ICH",
+            "category": "UTILITY_INVOICE",
             "customer_code": "PE0100098765",
             "service_provider": "EVN",
             "billing_period": "03/2026",
@@ -175,15 +175,15 @@ def utility_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[Li
 
 @asset(group_name="invoice_pipeline")
 def reimbursement_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
-    """Tài sản dữ liệu: Danh sách hóa đơn Công tác phí / Vé máy bay bóc tách chuyên biệt."""
-    pages = [p for p in extracted_invoice_pages if p["category"] == "HOA_DON_CONG_TAC_PHI"]
+    """Data asset: list of extracted travel reimbursement / flight ticket invoices."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "REIMBURSEMENT_INVOICE"]
     results = [
         {
             "page_num": p["page_num"],
-            "category": "HOA_DON_CONG_TAC_PHI",
+            "category": "REIMBURSEMENT_INVOICE",
             "employee_id": "NV-889",
-            "employee_name": "Nguyễn Văn A",
-            "route": "Hà Nội - TP.HCM",
+            "employee_name": "Nguyen Van A",
+            "route": "Hanoi - Ho Chi Minh City",
             "total_amount": 3200000,
             "is_deductible": True,
         }
@@ -201,15 +201,15 @@ def reimbursement_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Out
 
 @asset(group_name="invoice_pipeline")
 def invalid_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[List[Dict[str, Any]]]:
-    """Tài sản dữ liệu: Danh sách biên lai bán lẻ / hóa đơn không hợp lệ."""
-    pages = [p for p in extracted_invoice_pages if p["category"] == "BIEN_LAI_KHONG_HOP_LE"]
+    """Data asset: list of retail receipts / invalid invoices."""
+    pages = [p for p in extracted_invoice_pages if p["category"] == "INVALID_RECEIPT"]
     results = [
         {
             "page_num": p["page_num"],
-            "category": "BIEN_LAI_KHONG_HOP_LE",
+            "category": "INVALID_RECEIPT",
             "total_amount": 150000,
             "is_deductible": False,
-            "alert": "KHÔNG ĐƯỢC KHẤU TRỪ THUẾ TNDN",
+            "alert": "NOT DEDUCTIBLE FOR CORPORATE INCOME TAX",
         }
         for p in pages
     ]
@@ -217,14 +217,14 @@ def invalid_invoices(extracted_invoice_pages: List[Dict[str, Any]]) -> Output[Li
         results,
         metadata={
             "count": len(results),
-            "alert": "KHÔNG ĐƯỢC KHẤU TRỪ THUẾ TNDN",
+            "alert": "NOT DEDUCTIBLE FOR CORPORATE INCOME TAX",
             "total_invalid_vnd": MetadataValue.int(sum(r["total_amount"] for r in results)),
         },
     )
 
 
 # -------------------------------------------------------------
-# ASSET GOM KẾT QUẢ (FAN-IN TỰ ĐỘNG - KHÔNG CẦN IF/ELSE)
+# RESULT COLLECTION ASSET (AUTOMATIC FAN-IN - NO IF/ELSE NEEDED)
 # -------------------------------------------------------------
 @asset(group_name="invoice_pipeline")
 def categorized_invoices(
@@ -234,8 +234,8 @@ def categorized_invoices(
     invalid_invoices: List[Dict[str, Any]],
 ) -> Output[List[Dict[str, Any]]]:
     """
-    Tài sản dữ liệu: Tập hợp tất cả các hóa đơn đã bóc tách từ 4 nhánh chuyên biệt.
-    Không có bất kỳ if/else nào, Dagster tự động kết nối và gom 4 nhánh về đây!
+    Data asset: all invoices extracted from the 4 specialized branches.
+    No if/else at all - Dagster automatically wires up and fans in the 4 branches here!
     """
     all_records = vat_invoices + utility_invoices + reimbursement_invoices + invalid_invoices
     total_cost = sum(r["total_amount"] for r in all_records)
@@ -253,17 +253,17 @@ def categorized_invoices(
 
 
 # -------------------------------------------------------------
-# 🛡️ CHECK 2 (@asset_check: Kiểm tra công thức tính thuế GTGT)
+# 🛡️ CHECK 2 (@asset_check: Verify the VAT tax formula)
 # -------------------------------------------------------------
 @asset_check(
     asset=categorized_invoices,
-    description="Check 2: Kiểm tra công thức thuế GTGT (Tổng thanh toán == Tiền trước thuế + VAT)",
+    description="Check 2: Verify the VAT formula (Total payment == Amount before tax + VAT)",
 )
 def check_vat_tax_math(
     categorized_invoices: List[Dict[str, Any]]
 ) -> AssetCheckResult:
-    """Kiểm tra tính chính xác của phép tính thuế trên hóa đơn VAT."""
-    vat_invoices = [inv for inv in categorized_invoices if inv["category"] == "HOA_DON_VAT"]
+    """Verify the tax calculation on VAT invoices is correct."""
+    vat_invoices = [inv for inv in categorized_invoices if inv["category"] == "VAT_INVOICE"]
     math_errors = []
 
     for inv in vat_invoices:
@@ -279,7 +279,7 @@ def check_vat_tax_math(
         "metadata": {
             "vat_invoices_checked": MetadataValue.int(len(vat_invoices)),
             "math_errors_count": MetadataValue.int(len(math_errors)),
-            "assessment": "CÔNG THỨC THUẾ CHÍNH XÁC 100%" if passed else "LỖI: SAI LỆCH TIỀN THUẾ VAT",
+            "assessment": "TAX FORMULA 100% CORRECT" if passed else "ERROR: VAT AMOUNT MISMATCH",
         },
     }
     if not passed:
@@ -289,23 +289,23 @@ def check_vat_tax_math(
 
 
 # -------------------------------------------------------------
-# 🛡️ CHECK 3 (@asset_check: BLOCKING - Kiểm tra Ngân sách & Tiền âm)
+# 🛡️ CHECK 3 (@asset_check: BLOCKING - Verify budget & negative amounts)
 # -------------------------------------------------------------
 @asset_check(
     asset=categorized_invoices,
     blocking=True,
-    description="Check 3: Chặn đứng (Blocking): Nghiêm cấm hóa đơn âm tiền hoặc vượt trần ngân sách 100 triệu",
+    description="Check 3 (Blocking): Reject negative-amount invoices or totals over the 100 million budget cap",
 )
 def check_budget_limit_compliance(
     categorized_invoices: List[Dict[str, Any]]
 ) -> AssetCheckResult:
     """
-    Nếu tổng chi phí trong file PDF vượt trần ngân sách 100.000.000 VND hoặc có hóa đơn âm,
-    Dagster sẽ ĐÁNH DẤU FAILED và CHẶN ĐỨNG (BLOCK) không cho nạp vào Sổ Cái Chi Phí!
+    If the total expense in the PDF exceeds the 100,000,000 VND budget cap or any invoice is negative,
+    Dagster MARKS IT FAILED and BLOCKS it from being loaded into the Expense Ledger!
     """
     total_cost = sum(inv.get("total_amount", 0) for inv in categorized_invoices)
     has_negative_amount = any(inv.get("total_amount", 0) <= 0 for inv in categorized_invoices)
-    budget_limit = 100000000  # 100 triệu VNĐ
+    budget_limit = 100000000  # 100 million VND
 
     passed = (total_cost <= budget_limit) and (not has_negative_amount)
 
@@ -315,7 +315,7 @@ def check_budget_limit_compliance(
             "total_expense_vnd": MetadataValue.int(total_cost),
             "budget_limit_vnd": MetadataValue.int(budget_limit),
             "has_negative_amount": MetadataValue.bool(has_negative_amount),
-            "action": "CHO PHÉP CHỐT SỔ CÁI" if passed else "🚫 ĐÃ CHẶN ĐỨNG: VƯỢT NGÂN SÁCH HOẶC LỖI TIỀN ÂM!",
+            "action": "LEDGER LOCK ALLOWED" if passed else "🚫 BLOCKED: BUDGET EXCEEDED OR NEGATIVE AMOUNT!",
         },
     }
     if not passed:
@@ -325,21 +325,21 @@ def check_budget_limit_compliance(
 
 
 # -------------------------------------------------------------
-# ASSET 4: Sổ cái Chi phí Doanh nghiệp (Downstream Ledger Asset)
+# ASSET 4: Corporate Expense Ledger (Downstream Ledger Asset)
 # -------------------------------------------------------------
 @asset(group_name="invoice_pipeline")
 def monthly_financial_expense_ledger(
     categorized_invoices: List[Dict[str, Any]]
 ) -> Output[Dict[str, Any]]:
     """
-    Asset đích cuối cùng: Chốt Sổ Cái Chi Phí Tháng và đẩy vào ERP / SAP.
-    Chỉ chạy khi check_budget_limit_compliance (blocking=True) PASS 100%!
+    Final target asset: lock the monthly Expense Ledger and push it to ERP / SAP.
+    Only runs when check_budget_limit_compliance (blocking=True) PASSES 100%!
     """
     total_expense = sum(inv["total_amount"] for inv in categorized_invoices)
     total_vat = sum(inv.get("vat_amount", 0) for inv in categorized_invoices if inv.get("is_deductible", False))
 
     ledger_summary = {
-        "period": "Tháng 03/2026",
+        "period": "March 2026",
         "total_invoices_recorded": len(categorized_invoices),
         "total_approved_expense_vnd": total_expense,
         "total_vat_deductible_vnd": total_vat,
